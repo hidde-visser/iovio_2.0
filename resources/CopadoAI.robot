@@ -1180,8 +1180,8 @@ Extract Agent JSON Reply
     # parse_ai_json_reply() handles fence stripping, escape flattening,
     # invalid escape removal, and XPath \= re-injection in pure Python,
     # with no Robot Framework escaping-layer interference.
-    # ${parsed_json}=             Evaluate                    JsonSanitizer.parse_ai_json_reply($raw_text)
-    ${parsed_json}=             Evaluate                    JsonSanitizer.parse_ai_json_reply($raw_text)    modules=JsonSanitizer
+    ${parsed_json}=             Evaluate                    JsonSanitizer.parse_ai_json_reply($raw_text)
+    # ${parsed_json}=             Evaluate                    JsonSanitizer.parse_ai_json_reply($raw_text)    modules=JsonSanitizer
     Log To Console              Stack Parser: Contract extraction completed successfully.
 
     RETURN                      ${parsed_json}
