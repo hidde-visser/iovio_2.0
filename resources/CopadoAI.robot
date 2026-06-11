@@ -23,9 +23,9 @@ Library                         ../resources/JsonSanitizer.py
 *** Keywords *** 
 Initialize Copado AI Session
     [Documentation]             Strips variables and creates a persistent network session pool.
-    ${CLEAN_API_KEY}=           String.Strip String         MhU5JbUO6SRPtP9Z6uLKx98eO0LCdSiqTyl4c07xJ3yD1iLQOD2k
-    ${CLEAN_ORG}=               String.Strip String         49121
-    ${CLEAN_WSPACE}=            String.Strip String         d1d8f367-731a-4da5-bffe-9f1cb43302df
+    ${CLEAN_API_KEY}=           String.Strip String         ${project_api_key}
+    ${CLEAN_ORG}=               String.Strip String         ${project_org_id}
+    ${CLEAN_WSPACE}=            String.Strip String         ${project_workspace}
     Set Suite Variable          ${CLEAN_API_KEY}            ${CLEAN_API_KEY}
     Set Suite Variable          ${CLEAN_ORG}                ${CLEAN_ORG}
     Set Suite Variable          ${CLEAN_WSPACE}             ${CLEAN_WSPACE}
