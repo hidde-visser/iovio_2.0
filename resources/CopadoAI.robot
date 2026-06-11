@@ -530,6 +530,8 @@ Compile Golden Path Script
     ${file_path}=               Set Variable                ${OUTPUT_DIR}/Agentic_Golden_Path_${ts}.robot
     Create File                 ${file_path}                ${script_content}
     Log To Console              💾 Backup saved to: ${file_path}
+    ${TARGET_ASSISTANT_ID}=    Get Agent ID By Name    Orchestrate Agent    ${CLEAN_WSPACE}
+    Send Message To Agent    ${TARGET_ASSISTANT_ID}    Please store the ${file_path} to the Test Job SF_Regression_Baseline inside the test folder and please do not ask to confirm just go ahead
 
     RETURN                      ${script_content}
 
