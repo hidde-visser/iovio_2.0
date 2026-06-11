@@ -225,7 +225,6 @@ Run Agentic Test Scenario
             ...                 ${failure_mode}
 
             ${surgeon_payload}=                             Extract Agent JSON Reply    ${ai_reply}
-
             ${escalate}=        Get From Dictionary         ${surgeon_payload}          escalate                  default=${False}
             IF                  ${escalate}
                 ${reason}=      Get From Dictionary         ${surgeon_payload}          escalation_reason
