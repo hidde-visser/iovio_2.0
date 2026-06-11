@@ -36,7 +36,7 @@ MyTestCase
     ${ai_reply}=        Retrieve Agent Reply
     ${clean_steps}=            Extract And Sanitize Robot Script    ${ai_reply}
     ${ai_reply}=               Retrieve Agent Reply
-
+    Log To Console             ${ai_reply}
 
 
 
@@ -52,6 +52,7 @@ MyTestCase
 Build My Test Agentically
     [Documentation]    Kick off the AI test builder
     Initialize Copado AI Session
+    Attach Document To Dialogue                  ${OUTPUT_DIR}/objects_${ts}.json
     ${TARGET_ASSISTANT_ID}=    Get Agent ID By Name    Test Agent    ${CLEAN_WSPACE}
     Create Dialogue Thread     ${TARGET_ASSISTANT_ID}
 
