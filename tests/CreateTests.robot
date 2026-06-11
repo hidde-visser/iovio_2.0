@@ -28,7 +28,7 @@ MyTestCase
 
 
     Initialize Copado AI Session
-    ${TARGET_ASSISTANT_ID}=    Get Agent ID By Name    Test Agent    ${CLEAN_WSPACE}
+    ${TARGET_ASSISTANT_ID}=    Get Agent ID By Name    Orchestrate Agent    ${CLEAN_WSPACE}
     Create Dialogue Thread     ${TARGET_ASSISTANT_ID}
     Attach Document To Dialogue                  ${OUTPUT_DIR}/objects_${ts}.json
     ${doc}                        Verify Document Is Ready       objects_${ts}.json
@@ -53,14 +53,14 @@ Build My Test Agentically
     [Documentation]    Kick off the AI test builder
     Initialize Copado AI Session
     Attach Document To Dialogue                  ${OUTPUT_DIR}/objects_${ts}.json
-    ${TARGET_ASSISTANT_ID}=    Get Agent ID By Name    Test Agent    ${CLEAN_WSPACE}
+    ${TARGET_ASSISTANT_ID}=    Get Agent ID By Name    Orchestrate Agent    ${CLEAN_WSPACE}
     Create Dialogue Thread     ${TARGET_ASSISTANT_ID}
 
     # 1. Define your intent hardcoded for testing
     ${my_intent}=    Set Variable    Create a test that creates a new lead
     
     # 2. Get your AI Assistant ID (using your existing keyword)
-    ${assistant_id}=    Get Agent ID By Name    Test Agent    ${CLEAN_WSPACE}
+    ${assistant_id}=    Get Agent ID By Name    Orchestrate Agent    ${CLEAN_WSPACE}
     
     # 3. Fire the Orchestrator!
     Run Agentic Test Scenario    ${assistant_id}    ${my_intent}    
