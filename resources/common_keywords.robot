@@ -10,7 +10,7 @@ Library                         ../resources/ObjectSanitizer.py
 Resource                        ../resources/MetadataRetrieval.robot
 Library                         ../resources/DomParserLibrary.py
 Library                         ../resources/ExplorationSessionLibrary.py
-Resource                        ../resources/GeminiHelp.robot
+Resource                        ../resources/CopadoAI.robot
 
 
 *** Variables ***
