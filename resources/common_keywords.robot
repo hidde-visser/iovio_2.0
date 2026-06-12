@@ -16,8 +16,6 @@ Resource                        ../resources/CopadoAI.robot
 *** Variables ***
 # IMPORTANT: Please read the readme.txt to understand needed variables and how to handle them!!
 ${BROWSER}                      chrome
-${username}                     pace.delivery1@qentinel.com.demonew
-${login_url}                    https://qentinel--demonew.my.salesforce.com/            # Salesforce instance. NOTE: Should be overwritten in CRT variables
 ${home_url}                     ${login_url}/lightning/page/home
 
 
@@ -159,7 +157,7 @@ Run Agentic Test Scenario
     # Only attach the metadata file if a path was actually provided and exists.
     IF    $metadata_json_path != $NONE and $metadata_json_path != '${EMPTY}'
         Log To Console              📦 Attaching Salesforce Org Metadata Contract...
-        Wait Until Keyword Succeeds    10x    2s                Attach Document To Dialogue                 ${metadata_json_path}
+        Wait Until Keyword Succeeds    10x    2s                Attach Document To Dialogue        ${DIALOGUE_ID}         ${metadata_json_path}
     END
 
     ${ai_reply}=                Generate Initial Test Steps                             ${assistant_id}           ${user_intent}
@@ -253,6 +251,6 @@ Run Agentic Test Scenario
         END
 
     FINALLY
-        Compile Golden Path Script
+        Compile Golden Path Script                        ${DIALOGUE_ID}
     END
 
