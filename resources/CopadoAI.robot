@@ -45,7 +45,7 @@ Send Message To Agent
     ...                         warming up after creation or document upload.
     ...                         This keyword retries the POST up to ${max_retries} times using
     ...                         exponential backoff.
-    [Arguments]                 ${target_assistant_id}
+    [Arguments]                 ${target_assistant_id}      ${DIALOGUE_ID}
     ...                         ${prompt}
     ...                         ${max_retries}=10
     ...                         ${backoff_base}=10
@@ -65,7 +65,7 @@ Send Message To Agent
         ${url}                  Set Variable                /organizations/${CLEAN_ORG}/dialogues/${DIALOGUE_ID}/messages
         ${response}=            POST On Session
         ...                     alias=CopadoSession
-        ...                     url=/organizations/\${CLEAN_ORG}/dialogues/\${DIALOGUE_ID}/messages
+        ...                     url=${url}
         ...                     json=${message_payload}
         ...                     expected_status=any
         ...                     timeout=90
@@ -121,8 +121,8 @@ Capture Org Context And Prime AI Agent
     ${DIALOGUE_ID}              Create Dialogue Thread      ${TARGET_ASSISTANT_ID}
 
     Log To Console              🧠 Giving the ${agent_name} access to the org data...
-    Attach Document To Dialogue                             ${meta_file}
-    Verify Document Is Ready    org_context_${timestamp}.json
+    Attach Document To Dialogue                             ${meta_file}                ${DIALOGUE_ID}
+    Verify Document Is Ready    org_context_${timestamp}.json                           ${DIALOGUE_ID}
 
     RETURN                      ${meta_file}
 
@@ -134,9 +134,11 @@ Get Agent ID By Name
 
     Log To Console              Discovering assistants in workspace: ${WSPACE}
 
+    ${url_workspace}            Set Variable                /organizations/${CLEAN_ORG}/workspaces/${WSPACE}
+
     ${workspace_detail_res}=    GET On Session
     ...                         alias=CopadoSession
-    ...                         url=/organizations/${CLEAN_ORG}/workspaces/${WSPACE}
+    ...                         url=${url_workspace}
     ...                         expected_status=200
     ...                         timeout=90
 
@@ -171,9 +173,11 @@ Create Dialogue Thread
     ...                         workspaceId=${CLEAN_WSPACE}
     ...                         assistantId=${target_assistant_id}
 
+    ${url_dialogues}            Set Variable                /organizations/${CLEAN_ORG}/dialogues
+
     ${create_dial_res}=         POST On Session
     ...                         alias=CopadoSession
-    ...                         url=/organizations/${CLEAN_ORG}/dialogues
+    ...                         url=${url_dialogues}
     ...                         json=${dialogue_payload}
     ...                         expected_status=201
     ...                         timeout=90
@@ -186,14 +190,16 @@ Create Dialogue Thread
 
 Wait Until Dialogue Is Idle
     [Documentation]             Polls the dialogue state endpoint until the thread reports it is idle.
-    [Arguments]                 ${max_attempts}=12          ${poll_interval}=5s
+    [Arguments]                 ${max_attempts}=12          ${poll_interval}=5s         ${DIALOGUE_ID}
 
     Log To Console              ⏳ Waiting for dialogue ${DIALOGUE_ID} to become idle...
+
+    ${url}                      Set Variable                /organizations/${CLEAN_ORG}/dialogues/${DIALOGUE_ID}
 
     FOR                         ${attempt}                  IN RANGE                    1                           ${max_attempts} + 1
         ${dial_res}=            GET On Session
         ...                     alias=CopadoSession
-        ...                     url=/organizations/${CLEAN_ORG}/dialogues/${DIALOGUE_ID}
+        ...                     url=${url}
         ...                     expected_status=any
         ...                     timeout=30
 
@@ -224,7 +230,7 @@ Wait Until Dialogue Is Idle
 
 Attach Document To Dialogue
     [Documentation]             Uploads a local file using the persistent session pool.
-    [Arguments]                 ${file_path}
+    [Arguments]                 ${file_path}                ${DIALOGUE_ID}
 
     ${absolute_path}=           Normalize Path              ${file_path}
     Should Exist                ${absolute_path}
@@ -236,9 +242,11 @@ Attach Document To Dialogue
 
     ${upload_headers}=          Create Dictionary           accept=application/json
 
+    ${dialogue_document_url}    Set Variable                /organizations/${CLEAN_ORG}/dialogues/${DIALOGUE_ID}/documents
+
     ${upload_res}=              POST On Session
     ...                         alias=CopadoSession
-    ...                         url=/organizations/${CLEAN_ORG}/dialogues/${DIALOGUE_ID}/documents
+    ...                         url=${dialogue_document_url}
     ...                         headers=${upload_headers}
     ...                         files=${file_obj}
     ...                         expected_status=201
@@ -249,17 +257,21 @@ Attach Document To Dialogue
 
 
 Verify Document Is Ready
-    [Arguments]                 ${file_name}
+    [Arguments]                 ${file_name}                ${DIALOGUE_ID}
+
+    ${url}                      Set Variable                /organizations/${CLEAN_ORG}/dialogues/${DIALOGUE_ID}
 
     ${dialogue_res}=            GET On Session
     ...                         alias=CopadoSession
-    ...                         url=/organizations/${CLEAN_ORG}/dialogues/${DIALOGUE_ID}
+    ...                         url=${url}
     ...                         expected_status=any
     ...                         timeout=90
 
+    ${agent_session_url}        Set Variable                /organizations/${CLEAN_ORG}/dialogues/${DIALOGUE_ID}/agent-session
+
     ${session_res}=             GET On Session
     ...                         alias=CopadoSession
-    ...                         url=/organizations/${CLEAN_ORG}/dialogues/${DIALOGUE_ID}/agent-session
+    ...                         url=${agent_session_url}
     ...                         expected_status=any
     ...                         timeout=90
 
@@ -277,9 +289,11 @@ Retrieve Agent Reply
     [Documentation]             Waits for the streaming agent to finish, then fetches the last message.
     Sleep                       5s
 
+    ${dialogue_url}             Set Variable                /organizations/${CLEAN_ORG}/dialogues/${DIALOGUE_ID}
+
     ${history_res}=             GET On Session
     ...                         alias=CopadoSession
-    ...                         url=/organizations/${CLEAN_ORG}/dialogues/${DIALOGUE_ID}
+    ...                         url=${dialogue_url}
     ...                         expected_status=200
     ...                         timeout=90
 
@@ -294,6 +308,7 @@ Retrieve Agent Reply
 
 Compile Golden Path Script
     [Documentation]             Translates the JSON Golden Path into a pure Robot Framework script.
+    [Arguments]                 ${DIALOGUE_ID}
     ${script_content}=          Set Variable                *** Test Cases ***\nAgentic Generated Test\n
 
     FOR                         ${action}                   IN                          @{GOLDEN_PATH_SCRIPT}
@@ -304,14 +319,14 @@ Compile Golden Path Script
         ${step_string}=         Set Variable                \ \ \ \ ${keyword}
 
         FOR                     ${arg}                      IN                          @{args}
-            ${step_string}=     Catenate                    SEPARATOR=${SPACE}${SPACE}${SPACE}${SPACE}              ${step_string}              ${arg}
+            ${step_string}=     Catenate                    SEPARATOR\=${SPACE}${SPACE}${SPACE}${SPACE}              ${step_string}              ${arg}
         END
 
         FOR                     ${key}                      ${val}                      IN                          &{kwargs}
-            ${step_string}=     Catenate                    SEPARATOR=${SPACE}${SPACE}${SPACE}${SPACE}              ${step_string}              ${key}=${val}
+            ${step_string}=     Catenate                    SEPARATOR\=${SPACE}${SPACE}${SPACE}${SPACE}              ${step_string}              ${key}=${val}
         END
 
-        ${script_content}=      Catenate                    SEPARATOR=\n                ${script_content}           ${step_string}
+        ${script_content}=      Catenate                    ${script_content}           ${step_string}
     END
 
     Log To Console              🌟 COMPILED GOLDEN PATH SCRIPT 🌟
@@ -323,7 +338,7 @@ Compile Golden Path Script
     Log To Console              💾 Backup saved to: ${file_path}
 
     ${TARGET_ASSISTANT_ID}=     Get Agent ID By Name        Orchestrate Agent           ${CLEAN_WSPACE}
-    Send Message To Agent       ${TARGET_ASSISTANT_ID}      Please store the ${file_path} to the Test Job SF_Regression_Baseline inside the test folder and please do not ask to confirm just go ahead
+    Send Message To Agent       ${TARGET_ASSISTANT_ID}      ${DIALOGUE_ID}              Please store the ${file_path} to the Test Job SF_Regression_Baseline inside the test folder and please do not ask to confirm just go ahead
 
     RETURN                      ${script_content}
 
@@ -391,7 +406,7 @@ Execute Agentic JSON Steps
                 Set To Dictionary                           ${action}                   url_before                  ${url_before}
 
                 Log To Console                              ↳ Executing: ${keyword}
-                ${status}       ${message}=                 Run Keyword And Ignore Error                            ${keyword}                  @{escaped_args}    &{clean_kwargs}
+                ${status}     ${message}=                 Run Keyword And Ignore Error                            ${keyword}                  @{escaped_args}    &{clean_kwargs}
 
                 ${url_after}=                               GetUrl
                 Set To Dictionary                           ${action}                   url_after                   ${url_after}
@@ -454,7 +469,7 @@ Execute Agentic JSON Steps
                 ELSE
                     ${strategy_passed}=                     Set Variable                ${False}
                     ${failure_mode}=                        Set Variable                HARD_KEYWORD_ERROR
-                    ${last_error}=                          Catenate                    SEPARATOR=\n                ${last_error}               [Strategy failed] ${keyword} → ${message}
+                    ${last_error}=                          Catenate                    ${last_error}               [Strategy failed] ${keyword} → ${message}
                     Log To Console                          ↳ Strategy failed at ${keyword}: ${message}.
                     BREAK
                 END
@@ -485,7 +500,7 @@ Execute Agentic JSON Steps
 
 Generate Agentic System Prompt
     [Documentation]             Defines clean, low-bloat rules for the blind initial generation phase.
-    ${rules}=                   Catenate                    
+    ${rules}=                   Catenate
     ...                         You are an AI Test Agent operating Copado Robotic Testing (CRT) via QWeb and QForce.
     ...                         Translate the user intent into a clean, chronological sequence of baseline test steps.
     ...
@@ -507,7 +522,7 @@ Generate Agentic System Prompt
     ...                         ]
     ...                         ]
     ...                         }
-    ...                         ] 
+    ...                         ]
     RETURN                      ${rules}
 
 
@@ -528,3 +543,31 @@ Resolve Step Failure
     Log To Console              🆕 Opening fresh surgeon dialogue...
     ${DIALOGUE_ID}              Create Dialogue Thread      ${assistant_id}
     Log To Console              ✅ Surgeon dialogue created: ${DIALOGUE_ID}
+
+    # ════════════════════════════════════════════════════════════════════
+    # AGENTIC STEP TRACKING - Appenders & Setters
+    # ════════════════════════════════════════════════════════════════════
+
+Append To Proposed Steps
+    [Arguments]                 ${step}
+    Append To List              ${ALL_PROPOSED_STEPS}       ${step}
+    Set Suite Variable          @{ALL_PROPOSED_STEPS}       @{ALL_PROPOSED_STEPS}
+
+Append To Passed History
+    [Arguments]                 ${step}
+    Append To List              ${EXECUTION_HISTORY_PASSED}                             ${step}
+    Set Suite Variable          @{EXECUTION_HISTORY_PASSED}                             @{EXECUTION_HISTORY_PASSED}
+
+Append To Failed History
+    [Arguments]                 ${step}
+    Append To List              ${EXECUTION_HISTORY_FAILED}                             ${step}
+    Set Suite Variable          @{EXECUTION_HISTORY_FAILED}                             @{EXECUTION_HISTORY_FAILED}
+
+Append To Golden Path
+    [Arguments]                 ${step}
+    Append To List              ${GOLDEN_PATH_SCRIPT}       ${step}
+    Set Suite Variable          @{GOLDEN_PATH_SCRIPT}       @{GOLDEN_PATH_SCRIPT}
+
+Set All Proposed Steps
+    [Arguments]                 @{steps}
+    Set Suite Variable          @{ALL_PROPOSED_STEPS}       @{steps}
