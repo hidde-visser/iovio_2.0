@@ -99,3 +99,16 @@ Conversational AI Health Check
         # FIX 2: Omit the ${meta_file} argument so it doesn't try to upload it a second time
         Run Agentic Test Scenario                           ${TARGET_ASSISTANT_ID}      ${target_intent}
     END
+
+    # 7. Feed the AI's suggestions directly into your execution engine
+    FOR                         ${scenario}                 IN                          @{test_scenarios}
+        ${target_intent}=       Get From Dictionary         ${scenario}                 intent
+
+        Log To Console          \n======================================================
+        Log To Console          🚀 Now Executing AI Suggestion: ${target_intent}
+        Log To Console          ======================================================
+
+        # FIX 1: Use the ${REAL_ASSISTANT_UUID} instead of ${TARGET_ASSISTANT_ID}
+        # FIX 2: Omit the ${meta_file} argument so it doesn't try to upload it a second time
+        # Run Agentic Test Scenario                           ${TARGET_ASSISTANT_ID}      ${target_intent}
+    END
