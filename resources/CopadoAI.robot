@@ -89,7 +89,7 @@ Send Message To Agent
             END
 
             ${exponent}=        Evaluate                    ${attempt} - 1
-            ${wait_seconds}=    Evaluate                    ${backoff_base} * (2 ** ${exponent})
+            ${wait_seconds}=    Evaluate                    min(${backoff_base} * (2 ** ${exponent}), 30)
             Log To Console      ⚠️ 403 received. API not ready. Backing off ${wait_seconds}s before retry ${attempt + 1}/${max_retries}...
             Sleep               ${wait_seconds}s
             CONTINUE
