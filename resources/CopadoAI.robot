@@ -319,7 +319,9 @@ Verify Document Is Ready
 
 Retrieve Agent Reply
     [Documentation]             Waits for the streaming agent to finish, then fetches the last message.
-    Sleep                       5s
+    
+    # Dynamically wait for the stream to finish (up to 120 seconds)
+    Wait Until Dialogue Is Idle             ${DIALOGUE_ID}              max_attempts=24          poll_interval=5s
 
     ${dialogue_url}             Set Variable                /organizations/${CLEAN_ORG}/dialogues/${DIALOGUE_ID}
 
@@ -371,6 +373,9 @@ Compile Golden Path Script
 
     ${TARGET_ASSISTANT_ID}=     Get Agent ID By Name        Orchestrate Agent           ${CLEAN_WSPACE}
     Send Message To Agent       ${TARGET_ASSISTANT_ID}      ${DIALOGUE_ID}              Please store the ${file_path} to the Test Job SF_Regression_Baseline inside the test folder and please do not ask to confirm just go ahead
+    
+    # Wait for the AI to finish saving the file before we start the next test scenario
+    ${ignore_reply}=            Retrieve Agent Reply
 
     RETURN                      ${script_content}
 
