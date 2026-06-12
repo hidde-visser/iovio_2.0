@@ -229,6 +229,11 @@ Wait Until Dialogue Is Idle
         ${status}=              Get From Dictionary         ${dial_data}                status                      default=unknown
         ${is_processing}=       Get From Dictionary         ${dial_data}                is_processing               default=${False}
 
+        # ADD THIS BLOCK:
+        IF                      '${status}' in ['failed', 'error']
+            Fail                ❌ Dialogue entered an ERROR state during document indexing!
+        END
+
         Log To Console          [Attempt ${attempt}/${max_attempts}] Dialogue status: '${status}' | is_processing: ${is_processing}
 
         ${status_is_active}=    Run Keyword And Return Status
