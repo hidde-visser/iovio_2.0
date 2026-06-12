@@ -4,7 +4,6 @@ Documentation                   Example resource file with custom keywords. NOTE
 Library                         QForce
 Library                         String
 Library                         DateTime
-Library                         ../resources/DomParserLibrary.py
 Library                         OperatingSystem
 Library                         ../resources/ObjectSanitizer.py
 Resource                        ../resources/MetadataRetrieval.robot
@@ -38,7 +37,7 @@ End suite
 Login
     [Documentation]             Login to Salesforce instance. Takes instance_url, username and password as
     ...                         arguments. Uses values given in Copado Robotic Testing's variables section by default.
-    [Arguments]                 ${sf_instance_url}=${login_url}                         ${sf_username}=${username}                              ${sf_password}=${password}
+    [Arguments]                 ${sf_instance_url}=${login_url}                         ${sf_username}=${username}                      ${sf_password}=${password}
     GoTo                        ${sf_instance_url}
     TypeText                    Username                    ${sf_username}              delay=1
     TypeSecret                  Password                    ${sf_password}
@@ -46,8 +45,8 @@ Login
     # We'll check if variable ${secret} is given. If yes, fill the MFA dialog.
     # If not, MFA is not expected.
     # ${secret} is ${None} unless specifically given.
-    ${MFA_needed}=              Run Keyword And Return Status                           Should Not Be Equal         ${None}                     ${secret}
-    Run Keyword If              ${MFA_needed}               Fill MFA                    ${sf_username}              ${secret}                   ${sf_instance_url}
+    ${MFA_needed}=              Run Keyword And Return Status                           Should Not Be Equal         ${None}             ${secret}
+    Run Keyword If              ${MFA_needed}               Fill MFA                    ${sf_username}              ${secret}           ${sf_instance_url}
 
 
 Login As
@@ -76,7 +75,7 @@ Fill MFA
 Home
     [Documentation]             Example appstarte: Navigate to homepage, login if needed
     GoTo                        ${home_url}
-    ${login_status} =           IsText                      To access this page, you have to log in to Salesforce.                              2
+    ${login_status} =           IsText                      To access this page, you have to log in to Salesforce.                      2
     Run Keyword If              ${login_status}             Login
     ClickText                   Home
     VerifyTitle                 Home | Salesforce
@@ -144,23 +143,23 @@ Run Agentic Test Scenario
     ...
     ...                         v3 changes:
     ...                         - Passes ${user_intent} into Execute Agentic JSON Steps so it
-    ...                           flows all the way through to Resolve Step Failure and the surgeon
-    ...                           prompt. The surgeon now always knows the original test goal.
+    ...                         flows all the way through to Resolve Step Failure and the surgeon
+    ...                         prompt. The surgeon now always knows the original test goal.
     ...                         - Execute Agentic JSON Steps returns 5 values. The 5th value is
-    ...                           ${failure_mode} (HARD_KEYWORD_ERROR or SILENT_APP_ERROR).
+    ...                         ${failure_mode} (HARD_KEYWORD_ERROR or SILENT_APP_ERROR).
     ...                         - ${failure_mode} is forwarded to Resolve Step Failure so the
-    ...                           surgeon prompt is tailored to the correct failure class.
+    ...                         surgeon prompt is tailored to the correct failure class.
     [Arguments]                 ${assistant_id}             ${user_intent}              ${metadata_json_path}=${NONE}
 
     Log To Console              🚀 Starting Agentic Scenario for Intent: ${user_intent}
 
     # Only attach the metadata file if a path was actually provided and exists.
-    IF    $metadata_json_path != $NONE and $metadata_json_path != '${EMPTY}'
-        Log To Console              📦 Attaching Salesforce Org Metadata Contract...
-        Wait Until Keyword Succeeds    10x    2s                Attach Document To Dialogue        ${DIALOGUE_ID}         ${metadata_json_path}
+    IF                          $metadata_json_path != $NONE and $metadata_json_path != '${EMPTY}'
+        Log To Console          📦 Attaching Salesforce Org Metadata Contract...
+        Wait Until Keyword Succeeds                         10x                         2s                          Attach Document To Dialogue                  ${DIALOGUE_ID}    ${metadata_json_path}
     END
 
-    ${ai_reply}=                Generate Initial Test Steps                             ${assistant_id}           ${user_intent}
+    ${ai_reply}=                Generate Initial Test Steps                             ${assistant_id}             ${user_intent}
     ${active_steps}=            Extract Agent JSON Reply    ${ai_reply}
 
     ${global_retries}=          Set Variable                0
@@ -179,8 +178,8 @@ Run Agentic Test Scenario
             # ${user_intent} is passed so it flows through to the surgeon prompt.
             ${status}           ${failed_step}              ${error_msg}                ${failed_index}
             ...                 ${failure_mode}=            Execute Agentic JSON Steps
-            ...                                             ${active_steps}
-            ...                                             ${user_intent}
+            ...                 ${active_steps}
+            ...                 ${user_intent}
 
             IF                  '${status}' == 'PASS'
                 Log To Console                              ✅ Scenario completed successfully!
@@ -188,7 +187,7 @@ Run Agentic Test Scenario
             END
 
             # ── SAFE RETRY CIRCUIT BREAKERS ──────────────────────────────────
-            ${current_intent}=                              Get From Dictionary         ${failed_step}            intent
+            ${current_intent}=                              Get From Dictionary         ${failed_step}              intent
 
             IF                  $current_intent == $last_failed_intent
                 ${step_retries}=                            Evaluate                    ${step_retries} + 1
@@ -205,11 +204,11 @@ Run Agentic Test Scenario
 
             Log To Console      ⚠️ AI Intervention Required. Mode: ${failure_mode}. Capturing DOM...
             ${dom_json_path}=                               Capture Page Elements
-            ${remaining_steps}=                             Get Slice From List         ${active_steps}           ${failed_index + 1}
-            ${remaining_json}=                              Evaluate                    json.dumps($remaining_steps)                          json
+            ${remaining_steps}=                             Get Slice From List         ${active_steps}             ${failed_index + 1}
+            ${remaining_json}=                              Evaluate                    json.dumps($remaining_steps)                    json
 
             # Serialize the successful step history (with URL metadata) to pass to the surgeon.
-            ${executed_history_json}=                       Evaluate                    json.dumps($EXECUTION_HISTORY_PASSED)                 json
+            ${executed_history_json}=                       Evaluate                    json.dumps($EXECUTION_HISTORY_PASSED)           json
 
             Log To Console      🏥 Calling AI Surgeon for recovery. Failure mode: ${failure_mode}
             ${ai_reply}=        Resolve Step Failure
@@ -223,26 +222,26 @@ Run Agentic Test Scenario
             ...                 ${failure_mode}
 
             ${surgeon_payload}=                             Extract Agent JSON Reply    ${ai_reply}
-            ${escalate}=        Get From Dictionary         ${surgeon_payload}          escalate                  default=${False}
+            ${escalate}=        Get From Dictionary         ${surgeon_payload}          escalate                    default=${False}
             IF                  ${escalate}
                 ${reason}=      Get From Dictionary         ${surgeon_payload}          escalation_reason
                 Log To Console                              🛑 BUSINESS LOGIC BLOCKER: ${reason}
                 Fail            AI Escalated the test. Reason: ${reason}
             END
 
-            ${recovery_steps}=                              Get From Dictionary         ${surgeon_payload}        recovery_steps              default=@{EMPTY}
+            ${recovery_steps}=                              Get From Dictionary         ${surgeon_payload}          recovery_steps      default=@{EMPTY}
             IF                  ${recovery_steps}
                 Log To Console                              🩹 Executing Silent Recovery Steps...
                 FOR             ${rec_action}               IN                          @{recovery_steps}
-                    ${rec_kw}=                              Get From Dictionary         ${rec_action}             keyword
-                    ${rec_args}=                            Get From Dictionary         ${rec_action}             args                        default=@{EMPTY}
-                    ${rec_kwa}=                             Get From Dictionary         ${rec_action}             kwargs                      default=&{EMPTY}
+                    ${rec_kw}=                              Get From Dictionary         ${rec_action}               keyword
+                    ${rec_args}=                            Get From Dictionary         ${rec_action}               args                default=@{EMPTY}
+                    ${rec_kwa}=                             Get From Dictionary         ${rec_action}               kwargs              default=&{EMPTY}
                     Log To Console                          \ \ \ \ ${rec_kw}
-                    Run Keyword And Ignore Error            ${rec_kw}                   @{rec_args}               &{rec_kwa}
+                    Run Keyword And Ignore Error            ${rec_kw}                   @{rec_args}                 &{rec_kwa}
                 END
             END
 
-            ${active_steps}=    Get From Dictionary         ${surgeon_payload}          corrected_steps           default=@{EMPTY}
+            ${active_steps}=    Get From Dictionary         ${surgeon_payload}          corrected_steps             default=@{EMPTY}
             ${global_retries}=                              Evaluate                    ${global_retries} + 1
         END
 
@@ -251,6 +250,6 @@ Run Agentic Test Scenario
         END
 
     FINALLY
-        Compile Golden Path Script                        ${DIALOGUE_ID}
+        Compile Golden Path Script                          ${DIALOGUE_ID}
     END
 
