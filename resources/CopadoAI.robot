@@ -581,6 +581,32 @@ Resolve Step Failure
     ${DIALOGUE_ID}              Create Dialogue Thread      ${assistant_id}
     Log To Console              ✅ Surgeon dialogue created: ${DIALOGUE_ID}
 
+    # Attach the DOM state if available
+    IF  '${dom_json_path}' != '${NONE}'
+        Attach Document To Dialogue    ${dom_json_path}    ${DIALOGUE_ID}
+    END
+
+    # Build the Surgeon Prompt
+    ${surgeon_prompt}=          Catenate
+    ...                         You are an AI Surgeon tasked with fixing a broken test step.
+    ...                         Original Goal: ${user_intent}
+    ...                         Failed Step: ${failed_step}
+    ...                         Error Encountered: ${error_message}
+    ...                         Failure Mode: ${failure_mode}
+    ...                         Execution History: ${executed_history_json}
+    ...                         Remaining Steps: ${remaining_steps}
+    ...                         Please analyze the attached DOM context and provide a structured JSON response containing 'recovery_steps' or 'corrected_steps'.
+
+    # Send to agent and retrieve the reply
+    Send Message To Agent       ${assistant_id}    ${DIALOGUE_ID}    ${surgeon_prompt}
+    ${ai_reply}=                Retrieve Agent Reply
+    
+    # Restore the original dialogue ID so the main loop can continue later
+    Set Suite Variable          ${DIALOGUE_ID}     ${ORIGINAL_DIALOGUE_ID}
+    
+    RETURN                      ${ai_reply}
+
+
     # ════════════════════════════════════════════════════════════════════
     # AGENTIC STEP TRACKING - Appenders & Setters
     # ════════════════════════════════════════════════════════════════════
