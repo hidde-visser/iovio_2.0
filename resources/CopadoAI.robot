@@ -176,6 +176,11 @@ Get Agent ID By Name
         END
     END
 
+    # ADD THIS BLOCK:
+    IF                          '${TARGET_ASSISTANT_ID}' == 'knowledge'
+        Fail                    ❌ Could not find an Assistant named '${target_name}'. Please verify the name in your workspace.
+    END
+
     Log To Console              Resolved Assistant ID: ${TARGET_ASSISTANT_ID}
     RETURN                      ${TARGET_ASSISTANT_ID}
 
