@@ -139,54 +139,88 @@ Send Message To Agent
 
     END
 
-Capture And Export Org Context To File
+Capture Org Context And Prime AI Agent
     [Documentation]             Fetches live org data for a given Salesforce object area, sanitizes the
-    ...                         payload to reduce token size, and persists the result as a timestamped
-    ...                         JSON file under the Robot Framework output directory.
+    ...                         payload to reduce token size, persists the result as a timestamped JSON
+    ...                         file, and then initializes a Copado AI dialogue session with the exported
+    ...                         context attached and verified as ready.
     ...
-    ...                         This keyword is intended to provide grounded org context for AI-assisted
-    ...                         operations. The sanitization step removes noise and large fields that
-    ...                         would otherwise exceed model input limits.
+    ...                         This keyword combines two responsibilities into a single reusable step:
+    ...
+    ...                         1. *Org Context Pipeline* - Retrieves raw Salesforce object data,
+    ...                         wraps it in a typed dictionary, sanitizes it to remove noise and
+    ...                         oversized fields, and writes the result to a timestamped JSON file
+    ...                         under the Robot Framework output directory.
+    ...
+    ...                         2. *AI Agent Priming* - Initializes a Copado AI session for the
+    ...                         specified agent, creates a dialogue thread, attaches the exported
+    ...                         context file, and verifies the document is ready before returning.
+    ...                         This ensures the agent operates with full, grounded org awareness
+    ...                         rather than producing generic output.
     ...
     ...                         *Arguments:*
     ...                         - ``area_objects`` (str): The Salesforce object area to retrieve data for
     ...                         (e.g., ``Lead``, ``Opportunity``, ``Account``).
+    ...                         - ``timestamp`` (str): A pre-generated timestamp string used to name the
+    ...                         output file and verify the attached document. Expected format:
+    ...                         ``YYYY-MM-DDTHHMMSS`` (e.g., ``2026-06-12T105801``).
+    ...                         - ``agent_name`` (str): The display name of the Copado AI agent to
+    ...                         initialize. Defaults to ``Orchestrate Agent`` if not specified.
     ...
     ...                         *Returns:*
-    ...                         - ``meta_file`` (str): The absolute path to the generated JSON context file.
+    ...                         - ``meta_file`` (str): The absolute path to the generated and attached
+    ...                         JSON context file.
     ...
     ...                         *Output file naming convention:*
-    ...                         - Pattern: ``<OUTPUT_DIR>/org_context_<YYYY-MM-DDTHHMMSS>.json``
+    ...                         - Pattern: ``<OUTPUT_DIR>/org_context_<timestamp>.json``
     ...                         - Example: ``/output/org_context_2026-06-12T105801.json``
     ...
+    ...                         *Prerequisites:*
+    ...                         - Authentication must use the JWT login mechanism before calling this
+    ...                         keyword, per IOVIO Guardrails v0.1.
+    ...                         - ``${CLEAN_WSPACE}`` must be set in scope before calling this keyword,
+    ...                         as it is required by ``Get Agent ID By Name``.
+    ...
     ...                         *Example usage:*
-    ...                         | ${file_path}=             Capture And Export Org Context To File                  Lead
-    ...                         | ${file_path}=             Capture And Export Org Context To File                  Opportunity
+    ...                         | ${ts}=                    Get Time                    format=%Y-%m-%dT%H%M%S
+    ...                         | ${file_path}=             Capture Org Context And Prime AI Agent                  Lead                        ${ts}
+    ...                         | ${file_path}=             Capture Org Context And Prime AI Agent                  Opportunity                 ${ts}              Release Agent
     ...
     ...                         *Guardrails:*
     ...                         - Stored in ``resource/custom_keywords.robot`` per IOVIO Guardrails v0.1.
     ...                         - Authentication must use the JWT login mechanism before calling this keyword.
-    [Arguments]                 ${area_objects}             ${timestamp}
+    [Arguments]                 ${area_objects}             ${timestamp}                ${agent_name}=Orchestrate Agent
 
-    # Step 1: Generate a timestamp to ensure the output file name is unique per execution
-
-    # Step 2: Build the org contract configuration for the requested object area
+    # Step 1: Build the org contract configuration for the requested object area
     ${config}=                  Build Org Contract Config                               ${area_objects}
 
-    # Step 3: Execute the dynamic org data retrieval using the built configuration
+    # Step 2: Execute the dynamic org data retrieval using the built configuration
     ${raw_result}=              Execute Dynamic Operations                              ${config}
 
-    # Step 4: Wrap the raw result in a dictionary keyed by object type for sanitization
+    # Step 3: Wrap the raw result in a dictionary keyed by object type for sanitization
     ${obj_dict}=                Create Dictionary           Lead=${raw_result}
 
-    # Step 5: Sanitize and shrink the payload so downstream AI processing stays within token limits
+    # Step 4: Sanitize and shrink the payload so downstream AI processing stays within token limits
     ${clean_result}=            Sanitize Org Contract       ${obj_dict}
 
-    # Step 6: Compose the output file path and write the sanitized context to disk
+    # Step 5: Compose the output file path and write the sanitized context to disk
     ${meta_file}=               Set Variable                ${OUTPUT_DIR}/org_context_${timestamp}.json
     Create File                 ${meta_file}                ${clean_result}
 
+    # Step 6: Initialize the Copado AI session and resolve the target agent by name
+    Initialize Copado AI Session
+    ${TARGET_ASSISTANT_ID}=     Get Agent ID By Name        ${agent_name}               ${CLEAN_WSPACE}
+
+    # Step 7: Open a new dialogue thread scoped to the resolved agent
+    Create Dialogue Thread      ${TARGET_ASSISTANT_ID}
+
+    # Step 8: Attach the org context file and confirm the document is ready before returning
+    Log To Console              🧠 Giving the ${agent_name} access to the org data...
+    Attach Document To Dialogue                             ${meta_file}
+    Verify Document Is Ready    org_context_${timestamp}.json
+
     RETURN                      ${meta_file}
+
 
 
 Get Agent ID By Name
