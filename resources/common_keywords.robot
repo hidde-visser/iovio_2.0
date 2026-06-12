@@ -33,6 +33,14 @@ Setup Browser
 End suite
     Close All Browsers
 
+UI Login Via JWT
+    [Documentation]     Opens browser and logs in via JWT frontdoor.jsp — no password screen.
+    ...                 Uses CLIENT_ID, USERNAME, SERVER_KEY and SANDBOX from Project Settings.
+    OpenBrowser         about:blank                 ${BROWSER}
+    SetConfig           DefaultTimeout              45s
+    SetConfig           LineBreak                   ${EMPTY}
+    JwtAuthenticate     ${CLIENT_ID}                ${USERNAME}                 ${SERVER_KEY}    sandbox=${SANDBOX}
+    JwtLogin            /lightning/page/home
 
 Login
     [Documentation]             Login to Salesforce instance. Takes instance_url, username and password as
