@@ -123,7 +123,7 @@ Generate Initial Test Steps
     ${ai_reply}=                Retrieve Agent Reply
     
     RETURN                      ${ai_reply}
-    
+
 Capture Org Context And Prime AI Agent
     [Documentation]             Fetches live org data, sanitizes it, persists as JSON, and primes the AI thread.
     [Arguments]                 ${area_objects}             ${timestamp}                ${agent_name}=Orchestrate Agent
@@ -646,8 +646,8 @@ Extract Agent JSON Reply
             ${stripped}=        Evaluate                    str($text_val).strip()
 
             # Safe native string probing
-            ${starts_with_bracket}=                         Run Keyword And Return Status                           Should Start With           ${stripped}        [
-            ${starts_with_brace}=                           Run Keyword And Return Status                           Should Start With           ${stripped}        {
+            ${starts_with_bracket}=                         Run Keyword And Return Status                           Should Contain           ${stripped}        [
+            ${starts_with_brace}=                           Run Keyword And Return Status                           Should Contain           ${stripped}        {
             IF                  ${starts_with_bracket} or ${starts_with_brace}
                 ${raw_text}=    Set Variable                ${text_val}
                 BREAK
