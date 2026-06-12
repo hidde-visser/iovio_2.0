@@ -115,13 +115,13 @@ Generate Initial Test Steps
     ...                         USER INTENT: ${user_intent}
 
     Log To Console              🧠 Generating initial test steps for intent: ${user_intent}
-    
+
     # Send to the active dialogue thread (DIALOGUE_ID is stored as a suite variable)
     Send Message To Agent       ${assistant_id}             ${DIALOGUE_ID}              ${full_prompt}
-    
+
     # Wait for the AI's compiled response
     ${ai_reply}=                Retrieve Agent Reply
-    
+
     RETURN                      ${ai_reply}
 
 Capture Org Context And Prime AI Agent
@@ -258,7 +258,8 @@ Attach Document To Dialogue
 
     ${file_name}=               Fetch From Right            ${absolute_path}            /
     ${file_handle}=             Evaluate                    open($absolute_path, 'rb')
-    ${file_tuple}=              Create List                 ${file_name}                ${file_handle}              application/octet-stream
+    # ${file_tuple}=            Create List                 ${file_name}                ${file_handle}              application/octet-stream
+    ${file_tuple}=              Create List                 ${file_name}                ${file_handle}              application/json
     ${file_obj}=                Create Dictionary           file=${file_tuple}
 
     ${upload_headers}=          Create Dictionary           accept=application/json
@@ -340,11 +341,11 @@ Compile Golden Path Script
         ${step_string}=         Set Variable                \ \ \ \ ${keyword}
 
         FOR                     ${arg}                      IN                          @{args}
-            ${step_string}=     Catenate                    SEPARATOR\=${SPACE}${SPACE}${SPACE}${SPACE}              ${step_string}              ${arg}
+            ${step_string}=     Catenate                    SEPARATOR\=${SPACE}${SPACE}${SPACE}${SPACE}             ${step_string}             ${arg}
         END
 
         FOR                     ${key}                      ${val}                      IN                          &{kwargs}
-            ${step_string}=     Catenate                    SEPARATOR\=${SPACE}${SPACE}${SPACE}${SPACE}              ${step_string}              ${key}=${val}
+            ${step_string}=     Catenate                    SEPARATOR\=${SPACE}${SPACE}${SPACE}${SPACE}             ${step_string}             ${key}=${val}
         END
 
         ${script_content}=      Catenate                    ${script_content}           ${step_string}
@@ -370,7 +371,7 @@ Execute Agentic JSON Steps
     ...                         ${user_intent}
 
     @{DESTRUCTIVE_TRIGGERS}=    Create List
-    ...                         save                        next                        done                        submit                      confirm            create    finish
+    ...                         save                        next                        done                        submit                     confirm            create    finish
 
     FOR                         ${index}                    ${step}                     IN ENUMERATE                @{json_steps}
         ${step_intent}=         Get From Dictionary         ${step}                     intent
@@ -390,7 +391,7 @@ Execute Agentic JSON Steps
             FOR                 ${action}                   IN                          @{strategy_actions}
                 ${keyword}=     Get From Dictionary         ${action}                   keyword                     default=UNKNOWN_KEYWORD
                 ${args}=        Get From Dictionary         ${action}                   args                        default=@{EMPTY}
-                ${raw_kwargs}=                              Get From Dictionary         ${action}                   kwargs                      default=&{EMPTY}
+                ${raw_kwargs}=                              Get From Dictionary         ${action}                   kwargs                     default=&{EMPTY}
 
                 IF              '${keyword}' == 'UNKNOWN_KEYWORD'
                     ${strategy_passed}=                     Set Variable                ${False}
@@ -427,7 +428,7 @@ Execute Agentic JSON Steps
                 Set To Dictionary                           ${action}                   url_before                  ${url_before}
 
                 Log To Console                              ↳ Executing: ${keyword}
-                ${status}     ${message}=                 Run Keyword And Ignore Error                            ${keyword}                  @{escaped_args}    &{clean_kwargs}
+                ${status}       ${message}=                 Run Keyword And Ignore Error                            ${keyword}                 @{escaped_args}    &{clean_kwargs}
 
                 ${url_after}=                               GetUrl
                 Set To Dictionary                           ${action}                   url_after                   ${url_after}
@@ -448,7 +449,7 @@ Execute Agentic JSON Steps
                         Log To Console                      🔍 Destructive action detected. Running Post-Action Snag Check...
                         UseModal                            Off
                         ${snag_found}=                      IsText                      We hit a snag               timeout=3s
-                        ${review_found}=                    IsText                      Review the following fields                             timeout=2s
+                        ${review_found}=                    IsText                      Review the following fields                            timeout=2s
                         ${field_error}=                     IsElement
                         ...     xpath=//div[contains(@class,'slds-has-error')]
                         ...     timeout=2s
@@ -512,11 +513,11 @@ Execute Agentic JSON Steps
         IF                      not ${step_passed}
             Append To Failed History                        ${step}
             Log To Console      ❌ All strategies failed for: ${step_intent}. Mode: ${failure_mode}. Pausing for Agentic Re-Prompt.
-            RETURN              FAIL                        ${step}                     ${last_error}               ${index}                    ${failure_mode}
+            RETURN              FAIL                        ${step}                     ${last_error}               ${index}                   ${failure_mode}
         END
     END
 
-    RETURN                      PASS                        ${NONE}                     ${EMPTY}                    -1                          NONE
+    RETURN                      PASS                        ${NONE}                     ${EMPTY}                    -1                         NONE
 
 
 Generate Agentic System Prompt
@@ -621,7 +622,7 @@ Extract Agent JSON Reply
         FOR                     ${msg}                      IN                          @{messages}
             ${role}=            Get From Dictionary         ${msg}                      role                        default=${EMPTY}
             IF                  '${role}' == 'ai'
-                ${ai_content}=                              Get From Dictionary         ${msg}                      content                     default=${NONE}
+                ${ai_content}=                              Get From Dictionary         ${msg}                      content                    default=${NONE}
             END
         END
         IF                      $ai_content == $NONE
@@ -646,8 +647,8 @@ Extract Agent JSON Reply
             ${stripped}=        Evaluate                    str($text_val).strip()
 
             # Safe native string probing
-            ${starts_with_bracket}=                         Run Keyword And Return Status                           Should Contain           ${stripped}        [
-            ${starts_with_brace}=                           Run Keyword And Return Status                           Should Contain           ${stripped}        {
+            ${starts_with_bracket}=                         Run Keyword And Return Status                           Should Contain             ${stripped}        [
+            ${starts_with_brace}=                           Run Keyword And Return Status                           Should Contain             ${stripped}        {
             IF                  ${starts_with_bracket} or ${starts_with_brace}
                 ${raw_text}=    Set Variable                ${text_val}
                 BREAK
