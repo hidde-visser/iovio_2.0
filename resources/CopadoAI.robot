@@ -190,7 +190,7 @@ Create Dialogue Thread
 
 Wait Until Dialogue Is Idle
     [Documentation]             Polls the dialogue state endpoint until the thread reports it is idle.
-    [Arguments]                 ${max_attempts}=12          ${poll_interval}=5s         ${DIALOGUE_ID}
+    [Arguments]                 ${DIALOGUE_ID}              ${max_attempts}=12          ${poll_interval}=5s
 
     Log To Console              ⏳ Waiting for dialogue ${DIALOGUE_ID} to become idle...
 
