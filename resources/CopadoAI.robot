@@ -596,9 +596,21 @@ Execute Agentic JSON Steps
 
             # ── THE ACTION SEQUENCE LOOP ─────────────────────────────────────
             FOR                 ${action}                   IN                          @{strategy_actions}
-                ${keyword}=     Get From Dictionary         ${action}                   keyword
+                # ${keyword}=     Get From Dictionary         ${action}                   keyword
+                ${keyword}=     Get From Dictionary         ${action}                   keyword    default=UNKNOWN_KEYWORD
                 ${args}=        Get From Dictionary         ${action}                   args                      default=@{EMPTY}
                 ${raw_kwargs}=                              Get From Dictionary         ${action}                 kwargs                      default=&{EMPTY}
+
+                # ── GUARD: AI SCHEMA HALLUCINATION ───────────────────────────────────
+                # If the AI returns a malformed action object missing the 'keyword' key,
+                # fail this specific strategy early. This prevents the script from 
+                # crashing downstream during Kwargs sanitization or keyword execution.
+                IF    '${keyword}' == 'UNKNOWN_KEYWORD'
+                    ${strategy_passed}=    Set Variable    ${False}
+                    ${last_error}=         Catenate        ${last_error}    [Strategy failed] AI returned malformed JSON missing the 'keyword' key.
+                    BREAK
+                END
+
 
                 # ── KWARGS SANITIZATION ──────────────────────────────────────
                 ${is_dict}=     Evaluate                    isinstance($raw_kwargs, dict)
@@ -632,8 +644,7 @@ Execute Agentic JSON Steps
                 Set To Dictionary                           ${action}                   url_before                ${url_before}
 
                 Log To Console                              ↳ Executing: ${keyword}
-                ${status}       ${message}=                 Run Keyword And Ignore Error
-                ...             ${keyword}                  @{escaped_args}             &{clean_kwargs}
+                ${status}       ${message}=                 Run Keyword And Ignore Error                        ${keyword}                  @{escaped_args}             &{clean_kwargs}
 
                 # ── CAPTURE STATE AFTER ACTION ───────────────────────────────
                 ${url_after}=                               GetUrl
