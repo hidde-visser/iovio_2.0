@@ -58,27 +58,28 @@ Conversational AI Health Check
     TRY
         Log To Console          ⏳ Giving the AI 60 seconds to index the metadata document...
         Sleep                   60s
-        Wait Until Dialogue Is Idle            ${DIALOGUE_ID}             max_attempts=12             poll_interval=5s
-
+        
+        # FIX: Pass Dialogue ID as the first positional argument
+        Wait Until Dialogue Is Idle             ${DIALOGUE_ID}              max_attempts=12             poll_interval=5s
 
         Log To Console          💬 Sending prompt to agent...
-        Send Message To Agent              ${DIALOGUE_ID}                 ${TARGET_ASSISTANT_ID}      ${prompt}            max_retries=6
+        Send Message To Agent              ${TARGET_ASSISTANT_ID}      ${DIALOGUE_ID}      ${prompt}            max_retries=6
         ${ai_reply}=            Retrieve Agent Reply
 
     EXCEPT
         Log To Console          ⚠️ Agent thread seems locked/bricked. Initiating a new chat...
 
-        # Re-create the thread and re-attach the document
         ${DIALOGUE_ID}          Create Dialogue Thread      ${TARGET_ASSISTANT_ID}
-        Attach Document To Dialogue         ${DIALOGUE_ID}                ${meta_file}
-        Verify Document Is Ready            ${DIALOGUE_ID}                org_context_${ts}.json
+        Attach Document To Dialogue         ${meta_file}                ${DIALOGUE_ID}
+        Verify Document Is Ready            org_context_${timestamp}.json               ${DIALOGUE_ID}
 
         Log To Console          ⏳ Giving the new thread 60 seconds to index the metadata document...
         Sleep                   60s
-        Wait Until Dialogue Is Idle        ${DIALOGUE_ID}                 max_attempts=12             poll_interval=5s
+        
+        # FIX: Pass Dialogue ID as the first positional argument here too
+        Wait Until Dialogue Is Idle             ${DIALOGUE_ID}              max_attempts=12             poll_interval=5s
 
-        # Try sending the message one more time on the fresh thread
-        Send Message To Agent              ${DIALOGUE_ID}                 ${TARGET_ASSISTANT_ID}      ${prompt}            max_retries=6
+        Send Message To Agent              ${TARGET_ASSISTANT_ID}      ${DIALOGUE_ID}      ${prompt}             max_retries=6
         ${ai_reply}=            Retrieve Agent Reply
     END
 
