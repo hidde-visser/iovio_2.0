@@ -210,7 +210,7 @@ Capture Org Context And Prime AI Agent
     # Step 6: Initialize the Copado AI session and resolve the target agent by name
     Initialize Copado AI Session
     ${TARGET_ASSISTANT_ID}=     Get Agent ID By Name        ${agent_name}               ${CLEAN_WSPACE}
-
+    Set Global Variable         ${TARGET_ASSISTANT_ID}
     # Step 7: Open a new dialogue thread scoped to the resolved agent
     Create Dialogue Thread      ${TARGET_ASSISTANT_ID}
 
