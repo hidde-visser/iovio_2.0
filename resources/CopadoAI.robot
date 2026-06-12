@@ -21,6 +21,7 @@ Library                         ../resources/JsonSanitizer.py
 *** Keywords *** 
 Initialize Copado AI Session
     [Documentation]             Strips variables and creates a persistent network session pool.
+    Evaluate                    urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)    modules=urllib3
     ${CLEAN_API_KEY}=           String.Strip String         ${project_api_key}
     ${CLEAN_ORG}=               String.Strip String         ${project_org_id}
     ${CLEAN_WSPACE}=            String.Strip String         ${project_workspace}
