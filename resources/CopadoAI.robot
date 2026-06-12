@@ -571,3 +571,82 @@ Append To Golden Path
 Set All Proposed Steps
     [Arguments]                 @{steps}
     Set Suite Variable          @{ALL_PROPOSED_STEPS}       @{steps}
+
+
+Extract Agent JSON Reply
+    [Documentation]             Extracts and parses the JSON from Copado AI's structured reply safely.
+    ...                         Handles three input shapes:
+    ...                         1. A full dialogue dict     (the raw dialogue_data object)
+    ...                         2. A content list           (the AI message's content array)
+    ...                         3. A plain string           (a raw JSON text block, optionally fenced)
+    ...
+    ...                         All escape sanitization is delegated to JsonSanitizer.py to avoid
+    ...                         Robot Framework escaping-layer interference with regex patterns.
+    [Arguments]                 ${ai_final_reply}
+
+    ${raw_text}=                Set Variable                ${ai_final_reply}
+
+    # ── STEP 0: UNWRAP FULL DIALOGUE DICT ──────────────────────────────────
+    # If the caller passed the entire dialogue_data object, drill into
+    # messages -> last AI turn -> content list before any further processing.
+    ${is_dict}=                 Evaluate                    isinstance($ai_final_reply, dict)
+    IF                          ${is_dict}
+        ${messages}=            Get From Dictionary         ${ai_final_reply}           messages                    default=${NONE}
+        IF                      $messages == $NONE or len($messages) == 0
+            Fail                Parser Error: dialogue_data contains no messages.
+        END
+        # Walk messages to find the last AI (assistant) turn
+        ${ai_content}=          Set Variable                ${NONE}
+        FOR                     ${msg}                      IN                          @{messages}
+            ${role}=            Get From Dictionary         ${msg}                      role                        default=${EMPTY}
+            IF                  '${role}' == 'ai'
+                ${ai_content}=                              Get From Dictionary         ${msg}                      content                     default=${NONE}
+            END
+        END
+        IF                      $ai_content == $NONE
+            Fail                Parser Error: No AI message found in dialogue_data.
+        END
+        ${raw_text}=            Set Variable                ${ai_content}
+    END
+
+    # ── STEP 1: UNWRAP CONTENT LIST ────────────────────────────────────────
+    # Pull the raw JSON text payload out of the Copado API content list wrapper.
+    # Priority: prefer the block that carries an artifact (the structured JSON block).
+    # Fall back to the first block that starts with '[' or '{'.
+    ${is_list}=                 Evaluate                    isinstance($raw_text, list)
+    IF                          ${is_list}
+        FOR                     ${item}                     IN                          @{raw_text}
+            ${artifact}=        Get From Dictionary         ${item}                     artifact                    default=${NONE}
+            IF                  $artifact != $NONE
+                ${raw_text}=    Get From Dictionary         ${item}                     text
+                BREAK
+            END
+            ${text_val}=        Get From Dictionary         ${item}                     text                        default=${EMPTY}
+            ${stripped}=        Evaluate                    str($text_val).strip()
+
+            # Safe native string probing
+            ${starts_with_bracket}=                         Run Keyword And Return Status                           Should Start With           ${stripped}        [
+            ${starts_with_brace}=                           Run Keyword And Return Status                           Should Start With           ${stripped}        {
+            IF                  ${starts_with_bracket} or ${starts_with_brace}
+                ${raw_text}=    Set Variable                ${text_val}
+                BREAK
+            END
+        END
+    END
+
+    # Guard: after unwrapping, raw_text must now be a string
+    ${is_still_non_string}=     Evaluate                    not isinstance($raw_text, str)
+    IF                          ${is_still_non_string}
+        Log To Console          🚨 FATAL: raw_text type\=${raw_text.__class__.__name__} | value\=${raw_text}
+        Fail                    Parser Error: Input could not be reduced to a JSON string after unwrapping.
+    END
+
+    # ── STEP 2: SANITIZE + PARSE (delegated to Python library) ─────────────
+    # parse_ai_json_reply() handles fence stripping, escape flattening,
+    # invalid escape removal, and XPath \= re-injection in pure Python,
+    # with no Robot Framework escaping-layer interference.
+    ${parsed_json}=             Evaluate                    JsonSanitizer.parse_ai_json_reply($raw_text)
+    # ${parsed_json}=           Evaluate                    JsonSanitizer.parse_ai_json_reply($raw_text)            modules=JsonSanitizer
+    Log To Console              Stack Parser: Contract extraction completed successfully.
+
+    RETURN                      ${parsed_json}
