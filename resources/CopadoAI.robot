@@ -36,14 +36,14 @@ Initialize Copado AI Session
     ...                         X-Workspace-Id=${CLEAN_WSPACE}
 
     # Create a persistent session to automatically capture and forward tracking cookies
-    Create Session              alias=CopadoSession         url=https://copadogpt-api.robotic.copado.com          headers=${headers}
+    Create Session              alias=CopadoSession         url=https://copadogpt-api.robotic.copado.com            headers=${headers}
     Log To Console              Persistent request session initialized.
 
     # Send Message To Agent
     #                           [Documentation]             Sends a prompt message while ensuring Content-Type is pristine.
     #                           [Arguments]                 ${target_assistant_id}      ${prompt}
 
-    #                           ${msg_uuid}=                Evaluate                    str(uuid.uuid4())         modules=uuid
+    #                           ${msg_uuid}=                Evaluate                    str(uuid.uuid4())           modules=uuid
     #                           Log To Console              Sending message with request ID: ${msg_uuid}
 
     #                           ${msg_headers}=             Create Dictionary           Content-Type=application/json
@@ -91,7 +91,7 @@ Send Message To Agent
     ...                         assistantId=${target_assistant_id}
 
     # ── RETRY LOOP ──────────────────────────────────────────────────────────
-    FOR                         ${attempt}                  IN RANGE                    1                         ${max_retries} + 1
+    FOR                         ${attempt}                  IN RANGE                    1                           ${max_retries} + 1
 
         Log To Console          📤 [Attempt ${attempt}/${max_retries}] POSTing message to dialogue ${DIALOGUE_ID}...
 
@@ -138,6 +138,56 @@ Send Message To Agent
         ...                     Response body: ${response.text}
 
     END
+
+Capture And Export Org Context To File
+    [Documentation]             Fetches live org data for a given Salesforce object area, sanitizes the
+    ...                         payload to reduce token size, and persists the result as a timestamped
+    ...                         JSON file under the Robot Framework output directory.
+    ...
+    ...                         This keyword is intended to provide grounded org context for AI-assisted
+    ...                         operations. The sanitization step removes noise and large fields that
+    ...                         would otherwise exceed model input limits.
+    ...
+    ...                         *Arguments:*
+    ...                         - ``area_objects`` (str): The Salesforce object area to retrieve data for
+    ...                         (e.g., ``Lead``, ``Opportunity``, ``Account``).
+    ...
+    ...                         *Returns:*
+    ...                         - ``meta_file`` (str): The absolute path to the generated JSON context file.
+    ...
+    ...                         *Output file naming convention:*
+    ...                         - Pattern: ``<OUTPUT_DIR>/org_context_<YYYY-MM-DDTHHMMSS>.json``
+    ...                         - Example: ``/output/org_context_2026-06-12T105801.json``
+    ...
+    ...                         *Example usage:*
+    ...                         | ${file_path}=             Capture And Export Org Context To File                  Lead
+    ...                         | ${file_path}=             Capture And Export Org Context To File                  Opportunity
+    ...
+    ...                         *Guardrails:*
+    ...                         - Stored in ``resource/custom_keywords.robot`` per IOVIO Guardrails v0.1.
+    ...                         - Authentication must use the JWT login mechanism before calling this keyword.
+    [Arguments]                 ${area_objects}
+
+    # Step 1: Generate a timestamp to ensure the output file name is unique per execution
+    ${ts}=                      Get Time                    format=%Y-%m-%dT%H%M%S
+
+    # Step 2: Build the org contract configuration for the requested object area
+    ${config}=                  Build Org Contract Config                               ${area_objects}
+
+    # Step 3: Execute the dynamic org data retrieval using the built configuration
+    ${raw_result}=              Execute Dynamic Operations                              ${config}
+
+    # Step 4: Wrap the raw result in a dictionary keyed by object type for sanitization
+    ${obj_dict}=                Create Dictionary           Lead=${raw_result}
+
+    # Step 5: Sanitize and shrink the payload so downstream AI processing stays within token limits
+    ${clean_result}=            Sanitize Org Contract       ${obj_dict}
+
+    # Step 6: Compose the output file path and write the sanitized context to disk
+    ${meta_file}=               Set Variable                ${OUTPUT_DIR}/org_context_${ts}.json
+    Create File                 ${meta_file}                ${clean_result}
+
+    RETURN                      ${meta_file}
 
 
 Get Agent ID By Name
@@ -253,7 +303,7 @@ Wait Until Dialogue Is Idle
 
     Log To Console              ⏳ Waiting for dialogue ${DIALOGUE_ID} to become idle...
 
-    FOR                         ${attempt}                  IN RANGE                    1                         ${max_attempts} + 1
+    FOR                         ${attempt}                  IN RANGE                    1                           ${max_attempts} + 1
         ${dial_res}=            GET On Session
         ...                     alias=CopadoSession
         ...                     url=/organizations/${CLEAN_ORG}/dialogues/${DIALOGUE_ID}
@@ -264,8 +314,8 @@ Wait Until Dialogue Is Idle
 
         # The API exposes a 'status' or 'is_processing' field on the dialogue object.
         # We check both known field shapes defensively.
-        ${status}=              Get From Dictionary         ${dial_data}                status                    default=unknown
-        ${is_processing}=       Get From Dictionary         ${dial_data}                is_processing             default=${False}
+        ${status}=              Get From Dictionary         ${dial_data}                status                      default=unknown
+        ${is_processing}=       Get From Dictionary         ${dial_data}                is_processing               default=${False}
 
         Log To Console          [Attempt ${attempt}/${max_attempts}] Dialogue status: '${status}' | is_processing: ${is_processing}
 
@@ -299,7 +349,7 @@ Attach Document To Dialogue
 
     ${file_name}=               Fetch From Right            ${absolute_path}            /
     ${file_handle}=             Evaluate                    open($absolute_path, 'rb')
-    ${file_tuple}=              Create List                 ${file_name}                ${file_handle}            application/octet-stream
+    ${file_tuple}=              Create List                 ${file_name}                ${file_handle}              application/octet-stream
     ${file_obj}=                Create Dictionary           file=${file_tuple}
 
     ${upload_headers}=          Create Dictionary           accept=application/json
@@ -378,11 +428,11 @@ Extract And Sanitize Robot Script
     IF                          ${is_list}
         FOR                     ${item}                     IN                          @{ai_final_reply}
             ${has_artifact}=    Run Keyword And Return Status
-            ...                 Dictionary Should Contain Key                           ${item}                   artifact
+            ...                 Dictionary Should Contain Key                           ${item}                     artifact
             IF                  ${has_artifact}
                 ${artifact}=    Get From Dictionary         ${item}                     artifact
                 IF              $artifact != $NONE and $artifact.get('language') == 'robot'
-                    ${final_robot_script}=                  Get From Dictionary         ${item}                   text
+                    ${final_robot_script}=                  Get From Dictionary         ${item}                     text
                     Log To Console                          Prong 1 matched: structured artifact block found.
                     BREAK
                 END
@@ -406,7 +456,7 @@ Extract And Sanitize Robot Script
     IF                          $final_robot_script == $NONE
         Log To Console          Prong 2 activated: attempting markdown fence extraction.
         ${cropped_left}=        Fetch From Right            ${ai_final_reply}           \`\`\`robot
-        ${final_robot_script}=                              Fetch From Left             ${cropped_left}           \`\`\`
+        ${final_robot_script}=                              Fetch From Left             ${cropped_left}             \`\`\`
         ${final_robot_script}=                              Strip String                ${final_robot_script}
         Log To Console          Prong 2 extracted script block.
     END
@@ -422,7 +472,7 @@ Extract And Sanitize Robot Script
 
     FOR                         ${raw_line}                 IN                          @{script_lines}
         ${line}=                Strip String                ${raw_line}
-        ${line}=                Replace String              ${line}                     \r                        ${EMPTY}
+        ${line}=                Replace String              ${line}                     \r                          ${EMPTY}
 
         # Skip empty lines and pure comments
         IF                      $line == "" or $line.startswith('#')
@@ -506,21 +556,21 @@ Compile Golden Path Script
 
     FOR                         ${action}                   IN                          @{GOLDEN_PATH_SCRIPT}
         ${keyword}=             Get From Dictionary         ${action}                   keyword
-        ${args}=                Get From Dictionary         ${action}                   args                      default=@{EMPTY}
-        ${kwargs}=              Get From Dictionary         ${action}                   kwargs                    default=&{EMPTY}
+        ${args}=                Get From Dictionary         ${action}                   args                        default=@{EMPTY}
+        ${kwargs}=              Get From Dictionary         ${action}                   kwargs                      default=&{EMPTY}
 
         # Add 4 spaces for Robot Framework indentation
         ${step_string}=         Set Variable                \ \ \ \ ${keyword}
 
         FOR                     ${arg}                      IN                          @{args}
-            ${step_string}=     Catenate                    SEPARATOR=${SPACE}${SPACE}${SPACE}${SPACE}            ${step_string}              ${arg}
+            ${step_string}=     Catenate                    SEPARATOR=${SPACE}${SPACE}${SPACE}${SPACE}              ${step_string}              ${arg}
         END
 
-        FOR                     ${key}                      ${val}                      IN                        &{kwargs}
-            ${step_string}=     Catenate                    SEPARATOR=${SPACE}${SPACE}${SPACE}${SPACE}            ${step_string}              ${key}=${val}
+        FOR                     ${key}                      ${val}                      IN                          &{kwargs}
+            ${step_string}=     Catenate                    SEPARATOR=${SPACE}${SPACE}${SPACE}${SPACE}              ${step_string}              ${key}=${val}
         END
 
-        ${script_content}=      Catenate                    SEPARATOR=\n                ${script_content}         ${step_string}
+        ${script_content}=      Catenate                    SEPARATOR=\n                ${script_content}           ${step_string}
     END
 
     Log To Console              🌟 COMPILED GOLDEN PATH SCRIPT 🌟
@@ -530,8 +580,8 @@ Compile Golden Path Script
     ${file_path}=               Set Variable                ${OUTPUT_DIR}/Agentic_Golden_Path_${ts}.robot
     Create File                 ${file_path}                ${script_content}
     Log To Console              💾 Backup saved to: ${file_path}
-    ${TARGET_ASSISTANT_ID}=    Get Agent ID By Name    Orchestrate Agent    ${CLEAN_WSPACE}
-    Send Message To Agent    ${TARGET_ASSISTANT_ID}    Please store the ${file_path} to the Test Job SF_Regression_Baseline inside the test folder and please do not ask to confirm just go ahead
+    ${TARGET_ASSISTANT_ID}=     Get Agent ID By Name        Orchestrate Agent           ${CLEAN_WSPACE}
+    Send Message To Agent       ${TARGET_ASSISTANT_ID}      Please store the ${file_path} to the Test Job SF_Regression_Baseline inside the test folder and please do not ask to confirm just go ahead
 
     RETURN                      ${script_content}
 
@@ -557,7 +607,7 @@ Execute Agentic JSON Steps
     ...
     ...                         2. Four signals are probed:
     ...                         a. IsText                   We hit a snag               (timeout=3s)
-    ...                         b. IsText                   Review the following fields                           (timeout=2s)
+    ...                         b. IsText                   Review the following fields                             (timeout=2s)
     ...                         c. IsElement slds-has-error class                       (timeout=2s)
     ...                         d. IsElement slds-theme_error toast (timeout=2s)
     ...
@@ -575,9 +625,9 @@ Execute Agentic JSON Steps
     # Destructive trigger words. If any action arg matches one of these (case-insensitive),
     # the Post-Action Snag Check fires after that action completes with PASS.
     @{DESTRUCTIVE_TRIGGERS}=    Create List
-    ...                         save                        next                        done                      submit                      confirm            create    finish
+    ...                         save                        next                        done                        submit                      confirm            create    finish
 
-    FOR                         ${index}                    ${step}                     IN ENUMERATE              @{json_steps}
+    FOR                         ${index}                    ${step}                     IN ENUMERATE                @{json_steps}
         ${step_intent}=         Get From Dictionary         ${step}                     intent
         ${strategies}=          Get From Dictionary         ${step}                     strategies
         ${is_risky}=            Get From Dictionary         ${step}                     is_risky
@@ -596,18 +646,18 @@ Execute Agentic JSON Steps
 
             # ── THE ACTION SEQUENCE LOOP ─────────────────────────────────────
             FOR                 ${action}                   IN                          @{strategy_actions}
-                # ${keyword}=     Get From Dictionary         ${action}                   keyword
-                ${keyword}=     Get From Dictionary         ${action}                   keyword    default=UNKNOWN_KEYWORD
-                ${args}=        Get From Dictionary         ${action}                   args                      default=@{EMPTY}
-                ${raw_kwargs}=                              Get From Dictionary         ${action}                 kwargs                      default=&{EMPTY}
+            # ${keyword}=       Get From Dictionary         ${action}                   keyword
+                ${keyword}=     Get From Dictionary         ${action}                   keyword                     default=UNKNOWN_KEYWORD
+                ${args}=        Get From Dictionary         ${action}                   args                        default=@{EMPTY}
+                ${raw_kwargs}=                              Get From Dictionary         ${action}                   kwargs                      default=&{EMPTY}
 
                 # ── GUARD: AI SCHEMA HALLUCINATION ───────────────────────────────────
                 # If the AI returns a malformed action object missing the 'keyword' key,
-                # fail this specific strategy early. This prevents the script from 
+                # fail this specific strategy early. This prevents the script from
                 # crashing downstream during Kwargs sanitization or keyword execution.
-                IF    '${keyword}' == 'UNKNOWN_KEYWORD'
-                    ${strategy_passed}=    Set Variable    ${False}
-                    ${last_error}=         Catenate        ${last_error}    [Strategy failed] AI returned malformed JSON missing the 'keyword' key.
+                IF              '${keyword}' == 'UNKNOWN_KEYWORD'
+                    ${strategy_passed}=                     Set Variable                ${False}
+                    ${last_error}=                          Catenate                    ${last_error}               [Strategy failed] AI returned malformed JSON missing the 'keyword' key.
                     BREAK
                 END
 
@@ -619,13 +669,13 @@ Execute Agentic JSON Steps
                 END
 
                 ${clean_kwargs}=                            Create Dictionary
-                FOR             ${key}                      ${val}                      IN                        &{raw_kwargs}
+                FOR             ${key}                      ${val}                      IN                          &{raw_kwargs}
                     ${is_bool}=                             Evaluate                    isinstance($val, bool)
                     IF          ${is_bool}
                         ${str_val}=                         Evaluate                    str($val)
-                        Set To Dictionary                   ${clean_kwargs}             ${key}                    ${str_val}
+                        Set To Dictionary                   ${clean_kwargs}             ${key}                      ${str_val}
                     ELSE
-                        Set To Dictionary                   ${clean_kwargs}             ${key}                    ${val}
+                        Set To Dictionary                   ${clean_kwargs}             ${key}                      ${val}
                     END
                 END
 
@@ -641,14 +691,14 @@ Execute Agentic JSON Steps
 
                 # ── CAPTURE STATE BEFORE ACTION ──────────────────────────────
                 ${url_before}=                              GetUrl
-                Set To Dictionary                           ${action}                   url_before                ${url_before}
+                Set To Dictionary                           ${action}                   url_before                  ${url_before}
 
                 Log To Console                              ↳ Executing: ${keyword}
-                ${status}       ${message}=                 Run Keyword And Ignore Error                        ${keyword}                  @{escaped_args}             &{clean_kwargs}
+                ${status}       ${message}=                 Run Keyword And Ignore Error                            ${keyword}                  @{escaped_args}    &{clean_kwargs}
 
                 # ── CAPTURE STATE AFTER ACTION ───────────────────────────────
                 ${url_after}=                               GetUrl
-                Set To Dictionary                           ${action}                   url_after                 ${url_after}
+                Set To Dictionary                           ${action}                   url_after                   ${url_after}
 
                 IF              '${status}' == 'PASS'
 
@@ -674,9 +724,9 @@ Execute Agentic JSON Steps
                         UseModal                            Off
 
                         # Signal A: Primary snag banner
-                        ${snag_found}=                      IsText                      We hit a snag             timeout=3s
+                        ${snag_found}=                      IsText                      We hit a snag               timeout=3s
                         # Signal B: Field-level validation summary
-                        ${review_found}=                    IsText                      Review the following fields                           timeout=2s
+                        ${review_found}=                    IsText                      Review the following fields                             timeout=2s
                         # Signal C: Inline field error class
                         ${field_error}=                     IsElement
                         ...     xpath=//div[contains(@class,'slds-has-error')]
@@ -726,7 +776,7 @@ Execute Agentic JSON Steps
                 ELSE
                     ${strategy_passed}=                     Set Variable                ${False}
                     ${failure_mode}=                        Set Variable                HARD_KEYWORD_ERROR
-                    ${last_error}=                          Catenate                    SEPARATOR=\n              ${last_error}               [Strategy failed] ${keyword} → ${message}
+                    ${last_error}=                          Catenate                    SEPARATOR=\n                ${last_error}               [Strategy failed] ${keyword} → ${message}
                     Log To Console                          ↳ Strategy failed at ${keyword}: ${message}.
                     BREAK
                 END
@@ -752,12 +802,12 @@ Execute Agentic JSON Steps
             Log To Console      ❌ All strategies failed for: ${step_intent}. Mode: ${failure_mode}. Pausing for Agentic Re-Prompt.
 
             # Return 5 values: status, failed_step, error_msg, failed_index, failure_mode
-            RETURN              FAIL                        ${step}                     ${last_error}             ${index}                    ${failure_mode}
+            RETURN              FAIL                        ${step}                     ${last_error}               ${index}                    ${failure_mode}
         END
     END
 
     # PASS path: 5 concrete values to match the FAIL path signature.
-    RETURN                      PASS                        ${NONE}                     ${EMPTY}                  -1                          NONE
+    RETURN                      PASS                        ${NONE}                     ${EMPTY}                    -1                          NONE
 
 
 
@@ -802,7 +852,7 @@ Resolve Step Failure
     ...                         - Fix: replaced all f-string line-building Evaluate calls with Catenate,
     ...                         which accepts each component as a discrete argument and is immune to
     ...                         the space-splitting problem. The SEPARATOR is set to four spaces to
-    ...                         produce the same "keyword                               args                      kwargs" output format.
+    ...                         produce the same "keyword                               args                        kwargs" output format.
     ...                         - The safe Evaluate calls (join expressions with no spaces) are unchanged.
     [Arguments]                 ${assistant_id}
     ...                         ${failed_step}
@@ -839,9 +889,9 @@ Resolve Step Failure
     # Reading them directly from ${failed_step} always returns "unknown"/empty because
     # those keys do not exist at the step level.
 
-    ${failed_intent}=           Get From Dictionary         ${failed_step}              intent                    default=unknown
+    ${failed_intent}=           Get From Dictionary         ${failed_step}              intent                      default=unknown
 
-    ${failed_strategies}=       Get From Dictionary         ${failed_step}              strategies                default=@{EMPTY}
+    ${failed_strategies}=       Get From Dictionary         ${failed_step}              strategies                  default=@{EMPTY}
     ${rep_keyword}=             Set Variable                unknown
     ${rep_args_str}=            Set Variable                (none)
     ${rep_kwargs_str}=          Set Variable                (none)
@@ -852,9 +902,9 @@ Resolve Step Failure
         ${has_actions}=         Evaluate                    len($first_strategy) > 0
         IF                      ${has_actions}
             ${rep_action}=      Get From List               ${first_strategy}           0
-            ${rep_keyword}=     Get From Dictionary         ${rep_action}               keyword                   default=unknown
-            ${rep_args}=        Get From Dictionary         ${rep_action}               args                      default=@{EMPTY}
-            ${rep_kwargs}=      Get From Dictionary         ${rep_action}               kwargs                    default=&{EMPTY}
+            ${rep_keyword}=     Get From Dictionary         ${rep_action}               keyword                     default=unknown
+            ${rep_args}=        Get From Dictionary         ${rep_action}               args                        default=@{EMPTY}
+            ${rep_kwargs}=      Get From Dictionary         ${rep_action}               kwargs                      default=&{EMPTY}
             # Safe Evaluate: join expression contains no spaces, no RF splitting risk.
             ${rep_args_str}=    Evaluate                    ', '.join(str(a) for a in $rep_args)
             # Pre-compute kwargs string, then assign via IF to avoid inline conditional in Evaluate.
@@ -876,23 +926,23 @@ Resolve Step Failure
     #
     # Pattern for each line:
     #                           Catenate                    SEPARATOR=${SPACE}${SPACE}${SPACE}${SPACE}
-    #                           ...                         ${step_num}.                ${rem_kw}                 ${rem_args_str}             ${rem_kwa_suffix}
+    #                           ...                         ${step_num}.                ${rem_kw}                   ${rem_args_str}             ${rem_kwa_suffix}
     # When rem_kwa_suffix is ${EMPTY} the trailing separator is harmless.
 
     @{remaining_lines}=         Create List
     ${step_num}=                Set Variable                ${1}
 
     FOR                         ${rem_step}                 IN                          @{remaining_steps}
-        ${rem_strategies}=      Get From Dictionary         ${rem_step}                 strategies                default=@{EMPTY}
+        ${rem_strategies}=      Get From Dictionary         ${rem_step}                 strategies                  default=@{EMPTY}
         ${rem_has_strats}=      Evaluate                    len($rem_strategies) > 0
         IF                      ${rem_has_strats}
             ${rem_first}=       Get From List               ${rem_strategies}           0
             ${rem_has_acts}=    Evaluate                    len($rem_first) > 0
             IF                  ${rem_has_acts}
-                ${rem_action}=                              Get From List               ${rem_first}              0
-                ${rem_kw}=      Get From Dictionary         ${rem_action}               keyword                   default=unknown
-                ${rem_args}=    Get From Dictionary         ${rem_action}               args                      default=@{EMPTY}
-                ${rem_kwargs}=                              Get From Dictionary         ${rem_action}             kwargs                      default=&{EMPTY}
+                ${rem_action}=                              Get From List               ${rem_first}                0
+                ${rem_kw}=      Get From Dictionary         ${rem_action}               keyword                     default=unknown
+                ${rem_args}=    Get From Dictionary         ${rem_action}               args                        default=@{EMPTY}
+                ${rem_kwargs}=                              Get From Dictionary         ${rem_action}               kwargs                      default=&{EMPTY}
                 # Safe Evaluate: join expressions contain no spaces, no RF splitting risk.
                 ${rem_args_str}=                            Evaluate                    ', '.join(str(a) for a in $rem_args)
                 ${rem_kwa_raw}=                             Evaluate                    ', '.join(f"{k}={v}" for k, v in $rem_kwargs.items())
@@ -905,7 +955,7 @@ Resolve Step Failure
                 # FIX v7: Catenate builds the line. Each component is a discrete argument.
                 # Trailing empty suffix produces no extra separator because Catenate
                 # only inserts the separator BETWEEN non-empty components.
-                ${step_prefix}=                             Catenate                    SEPARATOR=.${SPACE}       ${step_num}                 ${rem_kw}
+                ${step_prefix}=                             Catenate                    SEPARATOR=.${SPACE}         ${step_num}                 ${rem_kw}
                 IF              '${rem_kwa_suffix}' != '${EMPTY}'
                     ${rem_line}=                            Catenate
                     ...         SEPARATOR=${SPACE}${SPACE}${SPACE}${SPACE}
@@ -940,7 +990,7 @@ Resolve Step Failure
     ELSE
         ${failure_context}=     Catenate                    SEPARATOR=\n
         ...                     FAILURE MODE: HARD_KEYWORD_ERROR
-        ...                     A QWord threw an exception. The action did not complete. BEFORE DOING ANYTHING REVIEW THE ATTACHED FILE: ${attached_file_name}. This contains the dom for the active state of the application which will tell you exactly what you need. 
+        ...                     A QWord threw an exception. The action did not complete. BEFORE DOING ANYTHING REVIEW THE ATTACHED FILE: ${attached_file_name}. This contains the dom for the active state of the application which will tell you exactly what you need.
         ...                     - The most likely cause is that a step was missing, hallucinated, or an incorrect value assigned to the step (For example, a picklist value that doesn't exist or a typo to match)
         ...                     - Inspect the DOM and the audit trail URL to determine actual browser state.
         ...                     - recovery_steps may be needed if the browser is in a stuck state.
@@ -958,9 +1008,9 @@ Resolve Step Failure
     ...                         built from the intent above. Every recovery decision you make must
     ...                         serve that intent. If a proposed step does not move toward completing
     ...                         that intent, it is wrong.
-    ...                         You should understand, this test was AI generated. A lot of guess work has been applied. 
-    ...                         Buttons, text, picklist we are trying to interact with can entirely be made up. Your sole 
-    ...                         goal should be to use what is available in to you from the JSON dom extraction to complete 
+    ...                         You should understand, this test was AI generated. A lot of guess work has been applied.
+    ...                         Buttons, text, picklist we are trying to interact with can entirely be made up. Your sole
+    ...                         goal should be to use what is available in to you from the JSON dom extraction to complete
     ...                         the intent successfully.
     ...
     ...                         ════════════════════════════════════════════
@@ -1139,16 +1189,16 @@ Extract Agent JSON Reply
     # messages -> last AI turn -> content list before any further processing.
     ${is_dict}=                 Evaluate                    isinstance($ai_final_reply, dict)
     IF                          ${is_dict}
-        ${messages}=            Get From Dictionary         ${ai_final_reply}           messages                  default=${NONE}
+        ${messages}=            Get From Dictionary         ${ai_final_reply}           messages                    default=${NONE}
         IF                      $messages == $NONE or len($messages) == 0
             Fail                Parser Error: dialogue_data contains no messages.
         END
         # Walk messages to find the last AI (assistant) turn
         ${ai_content}=          Set Variable                ${NONE}
         FOR                     ${msg}                      IN                          @{messages}
-            ${role}=            Get From Dictionary         ${msg}                      role                      default=${EMPTY}
+            ${role}=            Get From Dictionary         ${msg}                      role                        default=${EMPTY}
             IF                  '${role}' == 'ai'
-                ${ai_content}=                              Get From Dictionary         ${msg}                    content                     default=${NONE}
+                ${ai_content}=                              Get From Dictionary         ${msg}                      content                     default=${NONE}
             END
         END
         IF                      $ai_content == $NONE
@@ -1164,17 +1214,17 @@ Extract Agent JSON Reply
     ${is_list}=                 Evaluate                    isinstance($raw_text, list)
     IF                          ${is_list}
         FOR                     ${item}                     IN                          @{raw_text}
-            ${artifact}=        Get From Dictionary         ${item}                     artifact                  default=${NONE}
+            ${artifact}=        Get From Dictionary         ${item}                     artifact                    default=${NONE}
             IF                  $artifact != $NONE
                 ${raw_text}=    Get From Dictionary         ${item}                     text
                 BREAK
             END
-            ${text_val}=        Get From Dictionary         ${item}                     text                      default=${EMPTY}
+            ${text_val}=        Get From Dictionary         ${item}                     text                        default=${EMPTY}
             ${stripped}=        Evaluate                    str($text_val).strip()
 
             # Safe native string probing
-            ${starts_with_bracket}=                         Run Keyword And Return Status                         Should Start With           ${stripped}        [
-            ${starts_with_brace}=                           Run Keyword And Return Status                         Should Start With           ${stripped}        {
+            ${starts_with_bracket}=                         Run Keyword And Return Status                           Should Start With           ${stripped}        [
+            ${starts_with_brace}=                           Run Keyword And Return Status                           Should Start With           ${stripped}        {
             IF                  ${starts_with_bracket} or ${starts_with_brace}
                 ${raw_text}=    Set Variable                ${text_val}
                 BREAK
@@ -1194,7 +1244,7 @@ Extract Agent JSON Reply
     # invalid escape removal, and XPath \= re-injection in pure Python,
     # with no Robot Framework escaping-layer interference.
     ${parsed_json}=             Evaluate                    JsonSanitizer.parse_ai_json_reply($raw_text)
-    # ${parsed_json}=             Evaluate                    JsonSanitizer.parse_ai_json_reply($raw_text)    modules=JsonSanitizer
+    # ${parsed_json}=           Evaluate                    JsonSanitizer.parse_ai_json_reply($raw_text)            modules=JsonSanitizer
     Log To Console              Stack Parser: Contract extraction completed successfully.
 
     RETURN                      ${parsed_json}
