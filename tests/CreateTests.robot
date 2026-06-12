@@ -12,7 +12,7 @@ Suite Setup                     Initialize Salesforce Session
 
 *** Variables ***
 @{objects}                      Lead
-${TARGET_ASSISTANT_ID}          Orchestrate Agent
+${target_assistant_name}          Orchestrate Agent
 
 *** Test Cases ***
 Conversational AI Health Check
@@ -25,7 +25,7 @@ Conversational AI Health Check
     # ${meta_file}=             Set Variable                ${OUTPUT_DIR}/org_context_${ts}.json
     # Create File               ${meta_file}                ${result}
     ${ts}=                      Get Time                    format=%Y-%m-%dT%H%M%S
-    ${meta_file}                Capture Org Context And Prime AI Agent                  @{objects}           ${ts}                     ${TARGET_ASSISTANT_ID}
+    ${meta_file}                Capture Org Context And Prime AI Agent                  @{objects}           ${ts}                     ${target_assistant_name}
 
     # 4. Formulate the Guardrail-Bypass Prompt
     Log To Console              💬 Asking the AI what we should test...
@@ -51,6 +51,7 @@ Conversational AI Health Check
         Sleep                   60s
         Wait Until Dialogue Is Idle                         max_attempts=12             poll_interval=5s
 
+        
         Log To Console          💬 Sending prompt to agent...
         Send Message To Agent                               ${TARGET_ASSISTANT_ID}      ${prompt}            max_retries=6
         ${ai_reply}=            Retrieve Agent Reply
