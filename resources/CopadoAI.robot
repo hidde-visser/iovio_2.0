@@ -118,7 +118,7 @@ Capture Org Context And Prime AI Agent
     Initialize Copado AI Session
     ${TARGET_ASSISTANT_ID}=     Get Agent ID By Name        ${agent_name}               ${CLEAN_WSPACE}
 
-    Create Dialogue Thread      ${TARGET_ASSISTANT_ID}
+    ${DIALOGUE_ID}              Create Dialogue Thread      ${TARGET_ASSISTANT_ID}
 
     Log To Console              🧠 Giving the ${agent_name} access to the org data...
     Attach Document To Dialogue                             ${meta_file}
@@ -485,7 +485,7 @@ Execute Agentic JSON Steps
 
 Generate Agentic System Prompt
     [Documentation]             Defines clean, low-bloat rules for the blind initial generation phase.
-    ${rules}=                   Catenate                    SEPARATOR=\n
+    ${rules}=                   Catenate                    
     ...                         You are an AI Test Agent operating Copado Robotic Testing (CRT) via QWeb and QForce.
     ...                         Translate the user intent into a clean, chronological sequence of baseline test steps.
     ...
@@ -494,8 +494,7 @@ Generate Agentic System Prompt
     ...                         2. Separate "keyword", "args" (array), and "kwargs" (object) cleanly.
     ...                         3. THE 1-TO-1 ACTION RULE: Every object in the root array represents exactly ONE discrete browser interaction. Do not combine sequential steps.
     ...                         4. LINEAR CONTRACT: Because you cannot see the live DOM yet, provide exactly ONE execution track inside the "strategies" array. Do not attempt to guess or invent backup paths.
-    ...                         5. Ambiguous clicks (like "Save") MUST include "partial_match=False" in kwargs.
-    ...
+    ...                         5. Ambiguous clicks (like "Save") MUST include "partial_match\=False" in kwargs.
     ...                         INITIAL SCHEMA FORMAT:
     ...                         [
     ...                         {
@@ -508,7 +507,7 @@ Generate Agentic System Prompt
     ...                         ]
     ...                         ]
     ...                         }
-    ...                         ]
+    ...                         ] 
     RETURN                      ${rules}
 
 
@@ -527,5 +526,5 @@ Resolve Step Failure
     Log To Console              🔒 Original dialogue preserved: ${ORIGINAL_DIALOGUE_ID}
 
     Log To Console              🆕 Opening fresh surgeon dialogue...
-    Create Dialogue Thread      ${assistant_id}
+    ${DIALOGUE_ID}              Create Dialogue Thread      ${assistant_id}
     Log To Console              ✅ Surgeon dialogue created: ${DIALOGUE_ID}
