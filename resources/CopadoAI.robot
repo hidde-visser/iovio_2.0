@@ -102,7 +102,28 @@ Send Message To Agent
         ...                     Response body: ${response.text}
     END
 
+Generate Initial Test Steps
+    [Documentation]             Combines the system rules and user intent, sends it to the AI, and retrieves the structured JSON step sequence.
+    [Arguments]                 ${assistant_id}             ${user_intent}
 
+    # Fetch the rigid rules telling the AI to output exactly a JSON array
+    ${system_prompt}=           Generate Agentic System Prompt
+
+    # Combine the system rules with the specific scenario the test wants to run
+    ${full_prompt}=             Catenate                    SEPARATOR=\n\n
+    ...                         ${system_prompt}
+    ...                         USER INTENT: ${user_intent}
+
+    Log To Console              🧠 Generating initial test steps for intent: ${user_intent}
+    
+    # Send to the active dialogue thread (DIALOGUE_ID is stored as a suite variable)
+    Send Message To Agent       ${assistant_id}             ${DIALOGUE_ID}              ${full_prompt}
+    
+    # Wait for the AI's compiled response
+    ${ai_reply}=                Retrieve Agent Reply
+    
+    RETURN                      ${ai_reply}
+    
 Capture Org Context And Prime AI Agent
     [Documentation]             Fetches live org data, sanitizes it, persists as JSON, and primes the AI thread.
     [Arguments]                 ${area_objects}             ${timestamp}                ${agent_name}=Orchestrate Agent
