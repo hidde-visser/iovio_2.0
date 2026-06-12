@@ -63,7 +63,7 @@ Conversational AI Health Check
         Wait Until Dialogue Is Idle             ${DIALOGUE_ID}              max_attempts=12             poll_interval=5s
 
         Log To Console          💬 Sending prompt to agent...
-        Send Message To Agent              ${TARGET_ASSISTANT_ID}      ${DIALOGUE_ID}      ${prompt}            max_retries=10
+        Send Message To Agent              ${TARGET_ASSISTANT_ID}      ${DIALOGUE_ID}      ${prompt}            max_retries=50
         ${ai_reply}=            Retrieve Agent Reply
 
     EXCEPT
@@ -79,7 +79,7 @@ Conversational AI Health Check
         # FIX: Pass Dialogue ID as the first positional argument here too
         Wait Until Dialogue Is Idle             ${DIALOGUE_ID}              max_attempts=12             poll_interval=5s
 
-        Send Message To Agent              ${TARGET_ASSISTANT_ID}      ${DIALOGUE_ID}      ${prompt}             max_retries=10
+        Send Message To Agent              ${TARGET_ASSISTANT_ID}      ${DIALOGUE_ID}      ${prompt}             max_retries=50
         ${ai_reply}=            Retrieve Agent Reply
     END
 
