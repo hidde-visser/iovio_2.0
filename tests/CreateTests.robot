@@ -20,7 +20,7 @@ Conversational AI Health Check
 
     # # 1. Fetch the Org Data (The script does this, not the AI)
     ${timestamp}=               Get Time                    format=%Y-%m-%dT%H%M%S
-    ${config}=                  Build Org Contract Config                               ${objects}
+    ${config}=                  Build Org Contract Config                              ${objects}[0]
     ${raw_result}=              Execute Dynamic Operations                              ${config}
     ${obj_dict}=                Create Dictionary           Lead=${raw_result}
     ${clean_result}=            Sanitize Org Contract       ${obj_dict}
