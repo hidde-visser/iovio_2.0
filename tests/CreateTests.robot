@@ -12,54 +12,79 @@ Suite Setup                     Initialize Salesforce Session
 
 *** Variables ***
 @{objects}                      Lead
+${TARGET_ASSISTANT_ID}          Orchestrate Agent
 
 *** Test Cases ***
 Conversational AI Health Check
     [Documentation]             Feeds org data to the AI, asks for advice, and executes the results.
 
-    # 1. Fetch the Org Data (The script does this, not the AI)
+    # # 1. Fetch the Org Data (The script does this, not the AI)
+
+    # ${config}=                Build Org Contract Config                               Lead                 # You can expand this to multiple objects
+    # ${result}=                Execute Dynamic Operations                              ${config}
+    # ${meta_file}=             Set Variable                ${OUTPUT_DIR}/org_context_${ts}.json
+    # Create File               ${meta_file}                ${result}
     ${ts}=                      Get Time                    format=%Y-%m-%dT%H%M%S
-    ${config}=                  Build Org Contract Config                               Lead                        # You can expand this to multiple objects
-    ${result}=                  Execute Dynamic Operations                              ${config}
-    ${meta_file}=               Set Variable                ${OUTPUT_DIR}/org_context_${ts}.json
-    Create File                 ${meta_file}                ${result}
+    ${meta_file}                Capture Org Context And Prime AI Agent                  @{objects}           ${ts}                     ${TARGET_ASSISTANT_ID}
 
-    # 2. Setup the AI Dialogue
-    Initialize Copado AI Session
-    ${TARGET_ASSISTANT_ID}=     Get Agent ID By Name        Orchestrate Agent           ${CLEAN_WSPACE}
-    Create Dialogue Thread      ${TARGET_ASSISTANT_ID}
-
-    # 3. Give the AI the Org Context
-    Log To Console              🧠 Giving the Orchestrate Agent access to the org data...
-    Attach Document To Dialogue                             ${meta_file}
-    Verify Document Is Ready    org_context_${ts}.json
-
-    # 4. Use your suggested keywords to Ask the AI what to test
+    # 4. Formulate the Guardrail-Bypass Prompt
     Log To Console              💬 Asking the AI what we should test...
     ${prompt}=                  Catenate
-    ...                         You are a Salesforce QA Architect. I have attached the metadata for my Salesforce org.
-    ...                         Please perform a Health Check analysis on this metadata.
-    ...                         Identify the 3 most critical test scenarios we should execute based on validation rules, required fields, and layouts.
-    ...                         You MUST reply ONLY with a JSON array matching this exact schema:
-    ...                         [
-    ...                         { "intent": "Create a new Lead filling out all required fields to bypass validation rule X" }
+    ...                         You are a Salesforce QA Architect. I have attached the metadata for my Salesforce org.\n
+    ...                         Please perform a Health Check analysis on this metadata.\n
+    ...                         Identify the 3 most critical test scenarios we should execute based on validation rules, required fields, and layouts.\n
+    ...                         I understand that you must provide context and act as a knowledgeable mentor. Therefore, please explain your reasoning fully, but format your ENTIRE response as a structured JSON array.\n
+    ...                         Place your detailed mentor explanation inside the "explanation" key for each scenario.\n
+    ...                         You must use this exact JSON schema:\n
+    ...                         [\n
+    ...                         {\n
+    ...                         "object_name": "Lead",\n
+    ...                         "explanation": "Provide your detailed context and reasoning here...",\n
+    ...                         "intent": "Create a new Lead filling out all required fields"\n
+    ...                         }\n
     ...                         ]
 
-    Send Message To Agent       ${TARGET_ASSISTANT_ID}      ${prompt}
-    ${ai_reply}=                Retrieve Agent Reply
 
-    # 5. Parse the AI's reply into a usable list
+    # 5. Send the Message (With explicit Document Processing Wait and Circuit Breaker)
+    TRY
+        Log To Console          ⏳ Giving the AI 60 seconds to index the metadata document...
+        Sleep                   60s
+        Wait Until Dialogue Is Idle                         max_attempts=12             poll_interval=5s
+
+        Log To Console          💬 Sending prompt to agent...
+        Send Message To Agent                               ${TARGET_ASSISTANT_ID}      ${prompt}            max_retries=6
+        ${ai_reply}=            Retrieve Agent Reply
+
+    EXCEPT
+        Log To Console          ⚠️ Agent thread seems locked/bricked. Initiating a new chat...
+
+        # Re-create the thread and re-attach the document
+        Create Dialogue Thread                              ${TARGET_ASSISTANT_ID}
+        Attach Document To Dialogue                         ${meta_file}
+        Verify Document Is Ready                            org_context_${ts}.json
+
+        Log To Console          ⏳ Giving the new thread 60 seconds to index the metadata document...
+        Sleep                   60s
+        Wait Until Dialogue Is Idle                         max_attempts=12             poll_interval=5s
+
+        # Try sending the message one more time on the fresh thread
+        Send Message To Agent                               ${TARGET_ASSISTANT_ID}      ${prompt}            max_retries=6
+        ${ai_reply}=            Retrieve Agent Reply
+    END
+
+    # 6. Parse the AI's reply into a usable list
     ${test_scenarios}=          Extract Agent JSON Reply    ${ai_reply}
     Log To Console              🤖 The AI suggests we test: ${test_scenarios}
 
-    # 6. Feed the AI's suggestions directly into your execution engine
+    # 7. Feed the AI's suggestions directly into your execution engine
     FOR                         ${scenario}                 IN                          @{test_scenarios}
         ${target_intent}=       Get From Dictionary         ${scenario}                 intent
 
+        Log To Console          \n======================================================
         Log To Console          🚀 Now Executing AI Suggestion: ${target_intent}
-        Run Agentic Test Scenario                           ${TARGET_ASSISTANT_ID}      ${target_intent}            ${meta_file}
+        Log To Console          ======================================================
+        Run Agentic Test Scenario                           ${TARGET_ASSISTANT_ID}      ${target_intent}     ${meta_file}
     END
-
 
 
 
