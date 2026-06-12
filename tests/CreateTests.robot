@@ -12,20 +12,37 @@ Suite Setup                     Initialize Salesforce Session
 
 *** Variables ***
 @{objects}                      Lead
-${target_assistant_name}          Orchestrate Agent
+${target_assistant_name}        Orchestrate Agent
 
 *** Test Cases ***
 Conversational AI Health Check
     [Documentation]             Feeds org data to the AI, asks for advice, and executes the results.
 
     # # 1. Fetch the Org Data (The script does this, not the AI)
+    ${timestamp}=               Get Time                    format=%Y-%m-%dT%H%M%S
+    ${config}=                  Build Org Contract Config                               ${objects}
+    ${raw_result}=              Execute Dynamic Operations                              ${config}
+    ${obj_dict}=                Create Dictionary           Lead=${raw_result}
+    ${clean_result}=            Sanitize Org Contract       ${obj_dict}
+
+    ${meta_file}=               Set Variable                ${OUTPUT_DIR}/org_context_${timestamp}.json
+    Create File                 ${meta_file}                ${clean_result}
+
+    Initialize Copado AI Session
+    ${TARGET_ASSISTANT_ID}=     Get Agent ID By Name        ${target_assistant_name}    ${CLEAN_WSPACE}
+
+    ${DIALOGUE_ID}              Create Dialogue Thread      ${TARGET_ASSISTANT_ID}
+
+    Log To Console              🧠 Giving the ${target_assistant_name} access to the org data...
+    Attach Document To Dialogue                             ${meta_file}                ${DIALOGUE_ID}
+    Verify Document Is Ready    org_context_${timestamp}.json                           ${DIALOGUE_ID}
 
     # ${config}=                Build Org Contract Config                               Lead                 # You can expand this to multiple objects
     # ${result}=                Execute Dynamic Operations                              ${config}
     # ${meta_file}=             Set Variable                ${OUTPUT_DIR}/org_context_${ts}.json
     # Create File               ${meta_file}                ${result}
     ${ts}=                      Get Time                    format=%Y-%m-%dT%H%M%S
-    ${meta_file}                Capture Org Context And Prime AI Agent                  @{objects}           ${ts}                     ${target_assistant_name}
+    ${meta_file}                Capture Org Context And Prime AI Agent                  @{objects}           ${ts}                       ${target_assistant_name}
 
     # 4. Formulate the Guardrail-Bypass Prompt
     Log To Console              💬 Asking the AI what we should test...
@@ -44,32 +61,31 @@ Conversational AI Health Check
     ...                         }\n
     ...                         ]
 
-
     # 5. Send the Message (With explicit Document Processing Wait and Circuit Breaker)
     TRY
         Log To Console          ⏳ Giving the AI 60 seconds to index the metadata document...
         Sleep                   60s
-        Wait Until Dialogue Is Idle                         max_attempts=12             poll_interval=5s
+        Wait Until Dialogue Is Idle            ${DIALOGUE_ID}             max_attempts=12             poll_interval=5s
 
-        
+
         Log To Console          💬 Sending prompt to agent...
-        Send Message To Agent                               ${TARGET_ASSISTANT_ID}      ${prompt}            max_retries=6
+        Send Message To Agent              ${DIALOGUE_ID}                 ${TARGET_ASSISTANT_ID}      ${prompt}            max_retries=6
         ${ai_reply}=            Retrieve Agent Reply
 
     EXCEPT
         Log To Console          ⚠️ Agent thread seems locked/bricked. Initiating a new chat...
 
         # Re-create the thread and re-attach the document
-        Create Dialogue Thread                              ${TARGET_ASSISTANT_ID}
-        Attach Document To Dialogue                         ${meta_file}
-        Verify Document Is Ready                            org_context_${ts}.json
+        ${DIALOGUE_ID}          Create Dialogue Thread      ${TARGET_ASSISTANT_ID}
+        Attach Document To Dialogue         ${DIALOGUE_ID}                ${meta_file}
+        Verify Document Is Ready            ${DIALOGUE_ID}                org_context_${ts}.json
 
         Log To Console          ⏳ Giving the new thread 60 seconds to index the metadata document...
         Sleep                   60s
-        Wait Until Dialogue Is Idle                         max_attempts=12             poll_interval=5s
+        Wait Until Dialogue Is Idle        ${DIALOGUE_ID}                 max_attempts=12             poll_interval=5s
 
         # Try sending the message one more time on the fresh thread
-        Send Message To Agent                               ${TARGET_ASSISTANT_ID}      ${prompt}            max_retries=6
+        Send Message To Agent              ${DIALOGUE_ID}                 ${TARGET_ASSISTANT_ID}      ${prompt}            max_retries=6
         ${ai_reply}=            Retrieve Agent Reply
     END
 
@@ -84,140 +100,8 @@ Conversational AI Health Check
         Log To Console          \n======================================================
         Log To Console          🚀 Now Executing AI Suggestion: ${target_intent}
         Log To Console          ======================================================
-        Run Agentic Test Scenario                           ${TARGET_ASSISTANT_ID}      ${target_intent}     ${meta_file}
+
+        # FIX 1: Use the ${REAL_ASSISTANT_UUID} instead of ${TARGET_ASSISTANT_ID}
+        # FIX 2: Omit the ${meta_file} argument so it doesn't try to upload it a second time
+        Run Agentic Test Scenario                           ${TARGET_ASSISTANT_ID}      ${target_intent}
     END
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-MyTestCase
-    ${all_results}=             Create Dictionary
-
-    ${ts}=                      Get Time                    format=%Y-%m-%dT%H%M%S
-    FOR                         ${object}                   IN                          @{objects}
-        LogToConsole            Starting with object: ${object}
-        ${config}=              Build Org Contract Config                               ${object}
-        ${result}=              Execute Dynamic Operations                              ${config}
-        Set To Dictionary       ${all_results}              ${object}                   ${result}
-    END
-    ${clean}=                   Sanitize Org Contract       ${all_results}
-    Create File                 ${OUTPUT_DIR}/objects_${ts}.json                        ${clean}
-
-
-    Initialize Copado AI Session
-    ${TARGET_ASSISTANT_ID}=     Get Agent ID By Name        Orchestrate Agent           ${CLEAN_WSPACE}
-    Create Dialogue Thread      ${TARGET_ASSISTANT_ID}
-    Attach Document To Dialogue                             ${OUTPUT_DIR}/objects_${ts}.json
-    ${doc}                      Verify Document Is Ready    objects_${ts}.json
-    Send Message To Agent       ${TARGET_ASSISTANT_ID}      Tell me the exact layout, section by section, field by field, their drop down values, data types and validation rules they follow. I have attached a .json file that contains all relevent layout and metatadata to ensure accuracy. Review objects_\${ts}.json file that has been uploaded before generating any steps.
-    ${ai_reply}=                Retrieve Agent Reply
-    ${clean_steps}=             Extract And Sanitize Robot Script                       ${ai_reply}
-    ${ai_reply}=                Retrieve Agent Reply
-    Log To Console              ${ai_reply}
-
-
-
-
-
-
-
-
-
-
-
-
-Build My Test Agentically
-    [Documentation]             Kick off the AI test builder
-    Initialize Copado AI Session
-    Attach Document To Dialogue                             ${OUTPUT_DIR}/objects_${ts}.json
-    ${TARGET_ASSISTANT_ID}=     Get Agent ID By Name        Orchestrate Agent           ${CLEAN_WSPACE}
-    Create Dialogue Thread      ${TARGET_ASSISTANT_ID}
-
-    # 1. Define your intent hardcoded for testing
-    ${my_intent}=               Set Variable                Create a test that creates a new lead
-
-    # 2. Get your AI Assistant ID (using your existing keyword)
-    ${assistant_id}=            Get Agent ID By Name        Orchestrate Agent           ${CLEAN_WSPACE}
-
-    # 3. Fire the Orchestrator!
-    Run Agentic Test Scenario                               ${assistant_id}             ${my_intent}
-
-
-
-
-
-
-    ${body_html}=               Get Attribute               //body                      outerHTML
-    ${json_output}=             Parse Elements From HTML    ${body_html}
-
-
-
-
-
-
-
-
-
-    # ── POST-EXECUTION AUDIT LOGGING ────────────────────────────────────────
-
-    # A: Every step the AI proposed across all turns
-    ${all_proposed}=            Get All Proposed Steps
-    Log To Console              📋 ALL PROPOSED STEPS (${all_proposed.__len__()} total):
-    FOR                         ${step}                     IN                          @{all_proposed}
-        Log To Console          → ${step}
-    END
-
-    # B: Steps that passed without a CRT error
-    ${passed}=                  Get Execution History Passed
-    Log To Console              ✅ PASSED STEPS (${passed.__len__()} total):
-    FOR                         ${step}                     IN                          @{passed}
-        Log To Console          → ${step}
-    END
-
-    # C: Steps that threw a CRT error
-    ${failed}=                  Get Execution History Failed
-    Log To Console              ❌ FAILED STEPS (${failed.__len__()} total):
-    FOR                         ${step}                     IN                          @{failed}
-        Log To Console          → ${step}
-    END
-
-    # D: The final golden path to be saved as the real test asset
-    ${golden}=                  Get Golden Path Script
-    Log To Console              🏆 GOLDEN PATH SCRIPT (${golden.__len__()} total):
-    FOR                         ${step}                     IN                          @{golden}
-        Log To Console          → ${step}
-    END
-
-
-TestClass
-    Initialize Copado AI Session
-    # Log To Console            Assistant: ${full_data['assistant_id']}
-    # Log To Console            First message role: ${DIALOGUE_MESSAGES[0]['role']}
-    ${dialogue_data}=           Read Dialogue With Messages                             7774bcbc-cbe6-4ff2-ab47-65b59188adbc
-
-    Log To Console              ${dialogue_data}
-
-    Extract Agent JSON Reply    ${dialogue_data}
-    ${dialogue_data}=           Read Dialogue With Messages                             5966692b-50b7-409b-812d-7e7fb6d1b0d4
-
-    ${ai_reply}=                Retrieve Agent Reply
-    ${Json}=                    Extract Agent JSON Reply    ${ai_reply}
-
-    Log To Console              ${ai_reply}
-    Log To Console              ${Json}
