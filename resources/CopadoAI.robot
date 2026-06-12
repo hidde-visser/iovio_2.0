@@ -166,10 +166,9 @@ Capture And Export Org Context To File
     ...                         *Guardrails:*
     ...                         - Stored in ``resource/custom_keywords.robot`` per IOVIO Guardrails v0.1.
     ...                         - Authentication must use the JWT login mechanism before calling this keyword.
-    [Arguments]                 ${area_objects}
+    [Arguments]                 ${area_objects}             ${timestamp}
 
     # Step 1: Generate a timestamp to ensure the output file name is unique per execution
-    ${ts}=                      Get Time                    format=%Y-%m-%dT%H%M%S
 
     # Step 2: Build the org contract configuration for the requested object area
     ${config}=                  Build Org Contract Config                               ${area_objects}
@@ -184,7 +183,7 @@ Capture And Export Org Context To File
     ${clean_result}=            Sanitize Org Contract       ${obj_dict}
 
     # Step 6: Compose the output file path and write the sanitized context to disk
-    ${meta_file}=               Set Variable                ${OUTPUT_DIR}/org_context_${ts}.json
+    ${meta_file}=               Set Variable                ${OUTPUT_DIR}/org_context_${timestamp}.json
     Create File                 ${meta_file}                ${clean_result}
 
     RETURN                      ${meta_file}
