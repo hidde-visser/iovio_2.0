@@ -37,13 +37,6 @@ Conversational AI Health Check
     Attach Document To Dialogue                             ${meta_file}                ${DIALOGUE_ID}
     Verify Document Is Ready    org_context_${timestamp}.json                           ${DIALOGUE_ID}
 
-    # ${config}=                Build Org Contract Config                               Lead                 # You can expand this to multiple objects
-    # ${result}=                Execute Dynamic Operations                              ${config}
-    # ${meta_file}=             Set Variable                ${OUTPUT_DIR}/org_context_${ts}.json
-    # Create File               ${meta_file}                ${result}
-    ${ts}=                      Get Time                    format=%Y-%m-%dT%H%M%S
-    ${meta_file}                Capture Org Context And Prime AI Agent                  @{objects}           ${ts}                       ${target_assistant_name}
-
     # 4. Formulate the Guardrail-Bypass Prompt
     Log To Console              💬 Asking the AI what we should test...
     ${prompt}=                  Catenate
