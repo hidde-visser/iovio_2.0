@@ -354,7 +354,8 @@ Retrieve Agent Reply
 
 Compile Golden Path Script
     [Documentation]             Translates the JSON Golden Path into a pure Robot Framework script.
-    [Arguments]                 ${DIALOGUE_ID}
+    ...                         Insulated against 502/403 gateway crashes by reusing the active assistant ID.
+    [Arguments]                 ${DIALOGUE_ID}              ${assistant_id}=${NONE}
     # Injects the login keyword explicitly at the top of the compiled test
     ${script_content}=          Set Variable                *** Test Cases ***\nAgentic Generated Test\n\ \ \ \ UI Login Via JWT\n
 
@@ -384,7 +385,14 @@ Compile Golden Path Script
     Create File                 ${file_path}                ${script_content}
     Log To Console              💾 Backup saved to: ${file_path}
 
-    ${TARGET_ASSISTANT_ID}=     Get Agent ID By Name        Orchestrate Agent           ${CLEAN_WSPACE}
+    # ── NETWORK RESILIENCY CHECK ──
+    # If the assistant ID is passed, reuse it directly to protect teardown from gateway errors
+    IF                          '${assistant_id}' != '${NONE}' and '${assistant_id}' != '${EMPTY}'
+        ${TARGET_ASSISTANT_ID}=  Set Variable                ${assistant_id}
+    ELSE
+        ${TARGET_ASSISTANT_ID}=  Get Agent ID By Name        Orchestrate Agent           ${CLEAN_WSPACE}
+    END
+    
     Send Message To Agent       ${TARGET_ASSISTANT_ID}      ${DIALOGUE_ID}              Please store the ${file_path} to the Test Job SF_Regression_Baseline inside the test folder and please do not ask to confirm just go ahead
     
     # Wait for the AI to finish saving the file before we start the next test scenario
