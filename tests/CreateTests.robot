@@ -87,12 +87,13 @@ Conversational AI Health Check
     ${test_scenarios}=          Extract Agent JSON Reply    ${ai_reply}
     Log To Console              🤖 The AI suggests we test: ${test_scenarios}
 
+    # Initialize a collection to track defects/failures without halting the execution loop
+    ${failed_scenarios}=        Create List
+
     # 7. Feed the AI's suggestions directly into your execution engine
     FOR                         ${scenario}                 IN                          @{test_scenarios}
-        # ADD DEFAULT HERE
         ${target_intent}=       Get From Dictionary         ${scenario}                 intent    default=UNKNOWN_INTENT
 
-        # ADD SAFETY CHECK
         IF  '${target_intent}' == 'UNKNOWN_INTENT'
             Log To Console          ⚠️ Skipping scenario: AI generated an object without an 'intent' key.
             CONTINUE
@@ -102,7 +103,18 @@ Conversational AI Health Check
         Log To Console          🚀 Now Executing AI Suggestion: ${target_intent}
         Log To Console          ======================================================
 
-        # FIX 1: Use the ${REAL_ASSISTANT_UUID} instead of ${TARGET_ASSISTANT_ID}
-        # FIX 2: Omit the ${meta_file} argument so it doesn't try to upload it a second time
-        Run Agentic Test Scenario                           ${TARGET_ASSISTANT_ID}      ${target_intent}
+        # Execute using a non-blocking TRY block to tolerate defects and allow loop completion
+        TRY
+            Run Agentic Test Scenario                       ${TARGET_ASSISTANT_ID}      ${target_intent}
+        EXCEPT                  AS                          ${error_msg}
+            Log To Console      ❌ Scenario Execution Failed: ${error_msg}
+            Append To List      ${failed_scenarios}         Scenario: "${target_intent}" -> ${error_msg}
+        END
+    END
+
+    # Final summary evaluation: fail the test suite if any potential defects were gathered
+    ${num_failures}=            Get Length                  ${failed_scenarios}
+    IF                          ${num_failures} > 0
+        ${failure_summary}=     Catenate                    SEPARATOR=\n                @{failed_scenarios}
+        Fail                    Autonomous orchestration finished with potential defects or script failures:\n${failure_summary}
     END
