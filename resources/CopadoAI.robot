@@ -257,13 +257,14 @@ Retrieve Agent Reply
 
 Compile Golden Path Script
     [Documentation]             Translates the JSON Golden Path into a pure Robot Framework script.
-    ...                         Formats the output with structural Settings, Suite Setup, and clean step breaks.
+...                         Formats the output with structural Settings, Suite Setup, and clean step breaks.
     [Arguments]                 ${DIALOGUE_ID}              ${assistant_id}=${NONE}
     
     ${four_spaces}=             Set Variable                ${SPACE}${SPACE}${SPACE}${SPACE}
     
     # ── BUILD THE CORRECT ROBOT FRAMEWORK HEADERS ────────────────────────────
-    ${settings_block}=          Set Variable                *** Settings ***\nResource${four_spaces}../resources/common_keywords.robot\nSuite Setup${four_spaces}UI Login Via JWT\n\n
+    # Modified to include a generic Test Setup calling the "Home" keyword for every script execution
+    ${settings_block}=          Set Variable                *** Settings ***\nResource${four_spaces}../resources/common_keywords.robot\nSuite Setup${four_spaces}UI Login Via JWT\nTest Setup${four_spaces}Home\n\n
     ${test_cases_block}=        Set Variable                *** Test Cases ***\nAgentic Generated Test\n
     ${script_content}=          Set Variable                ${settings_block}${test_cases_block}
     # ─────────────────────────────────────────────────────────────────────────
@@ -283,12 +284,12 @@ Compile Golden Path Script
 
         # Append positional arguments separated by 4 spaces
         FOR                     ${arg}                      IN                          @{args}
-            ${step_string}=     Catenate                    SEPARATOR\=${four_spaces}             ${step_string}             ${arg}
+            ${step_string}=     Catenate                    SEPARATOR=${four_spaces}    ${step_string}              ${arg}
         END
 
         # Append keyword arguments separated by 4 spaces
         FOR                     ${key}                      ${val}                      IN                          &{kwargs}
-            ${step_string}=     Catenate                    SEPARATOR\=${four_spaces}             ${step_string}             ${key}=${val}
+            ${step_string}=     Catenate                    SEPARATOR=${four_spaces}    ${step_string}              ${key}=${val}
         END
 
         # Append the complete formatted line with a trailing explicit newline character (\n)
@@ -305,7 +306,7 @@ Compile Golden Path Script
     Log To Console              💾 Backup saved to: ${file_path}
 
     IF                          '${assistant_id}' != '${NONE}' and '${assistant_id}' != '${EMPTY}'
-        ${TARGET_ASSISTANT_ID}=  Set Variable                ${assistant_id}
+        ${TARGET_ASSISTANT_ID}=  Set Variable               ${assistant_id}
     ELSE
         ${TARGET_ASSISTANT_ID}=  Get Agent ID By Name        Orchestrate Agent           ${CLEAN_WSPACE}
     END
@@ -314,8 +315,8 @@ Compile Golden Path Script
     ...                         Please create a new file named "${file_name}" inside the "tests/" folder of the Test Job "${TEST_JOB_NAME}" (ID: ${TEST_JOB_ID}) within Project "${PROJECT_NAME}" (ID: ${PROJECT_ID}).\n\n
     ...                         Here is the exact file content you must write:\n
     ...                         ${script_content}\n\n
-    ...                         Do not attempt to read local filesystem paths and do not pause to ask for human confirmation. Use your internal file upload/creation tools to commit this content immediately.
-    
+    ...                         Do not attempt to read local filesystem paths and do not pause to ask for human confirmation.
+    ...                         Use your internal file upload/creation tools to commit this content immediately.
     Send Message To Agent       ${TARGET_ASSISTANT_ID}      ${DIALOGUE_ID}              ${agent_prompt}
     ${ignore_reply}=            Retrieve Agent Reply
     RETURN                      ${script_content}
