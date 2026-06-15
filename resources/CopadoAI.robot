@@ -26,7 +26,8 @@ ${TEST_JOB_NAME}                SF_Regression_Baseline
 ${TEST_JOB_ID}                  188251
 # ─────────────────────────────────────────────────────────────────────────
 
-*** Keywords *** Initialize Copado AI Session
+*** Keywords *** 
+Initialize Copado AI Session
     [Documentation]             Strips variables and creates a persistent network session pool.
     Evaluate                    urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)    modules=urllib3
     ${CLEAN_API_KEY}=           String.Strip String         ${project_api_key}
