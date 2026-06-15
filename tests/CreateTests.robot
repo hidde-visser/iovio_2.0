@@ -42,7 +42,7 @@ Conversational AI Health Check
     ${prompt}=                  Catenate
     ...                         You are a Salesforce QA Architect. I have attached the metadata for my Salesforce org.\n
     ...                         Please perform a Health Check analysis on this metadata.\n
-    ...                         Identify the 3 most critical test scenarios we should execute based on validation rules, required fields, and layouts.\n
+    ...                         Identify the 1 most critical test scenarios we should execute based on validation rules, required fields, and layouts.\n
     ...                         I understand that you must provide context and act as a knowledgeable mentor. Therefore, please explain your reasoning fully, but format your ENTIRE response as a structured JSON array.\n
     ...                         Place your detailed mentor explanation inside the "explanation" key for each scenario.\n
     ...                         You must use this exact JSON schema:\n
