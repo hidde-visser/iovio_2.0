@@ -216,8 +216,17 @@ Run Agentic Test Scenario
 
             IF                  ${step_retries} >= ${MAX_STEP_RETRIES}
                 Log To Console                              🛑 FATAL: Stuck looping on step index [${failed_index}] 3 consecutive times.
-                Log To Console                              Mode: ${failure_mode}. Error: ${error_msg}
-                Fail            Agentic Loop Aborted: AI is looping or blocked by Business Logic.
+                Log To Console                              Mode: ${failure_mode}.
+                Log To Console                              Error: ${error_msg}
+                
+                # Check if the user intent implies negative/validation testing
+                ${is_negative_test}=                        Evaluate                    any(w in $user_intent.lower() for w in ['exceed', 'limit', 'error', 'validation', 'invalid', 'boundary'])
+                
+                IF              ${is_negative_test}
+                    Fail        Potential Defect Found: AI stuck looping on verification step. Expected application to enforce validation limits/error banners, but the operation proceeded and application state shifted. Intent: ${user_intent}
+                ELSE
+                    Fail        Agentic Loop Aborted: AI is looping or blocked by Business Logic.
+                END
             END
             # ─────────────────────────────────────────────────────────────────
 
