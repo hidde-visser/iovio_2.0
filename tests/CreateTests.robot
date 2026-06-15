@@ -89,7 +89,14 @@ Conversational AI Health Check
 
     # 7. Feed the AI's suggestions directly into your execution engine
     FOR                         ${scenario}                 IN                          @{test_scenarios}
-        ${target_intent}=       Get From Dictionary         ${scenario}                 intent
+        # ADD DEFAULT HERE
+        ${target_intent}=       Get From Dictionary         ${scenario}                 intent    default=UNKNOWN_INTENT
+
+        # ADD SAFETY CHECK
+        IF  '${target_intent}' == 'UNKNOWN_INTENT'
+            Log To Console          ⚠️ Skipping scenario: AI generated an object without an 'intent' key.
+            CONTINUE
+        END
 
         Log To Console          \n======================================================
         Log To Console          🚀 Now Executing AI Suggestion: ${target_intent}
