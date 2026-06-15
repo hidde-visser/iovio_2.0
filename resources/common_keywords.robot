@@ -171,7 +171,7 @@ Run Agentic Test Scenario
     ${active_steps}=            Extract Agent JSON Reply    ${ai_reply}
 
     ${global_retries}=          Set Variable                0
-    ${MAX_GLOBAL_RETRIES}=      Set Variable                10
+    ${MAX_GLOBAL_RETRIES}=      Set Variable                50
     ${step_retries}=            Set Variable                0
     ${MAX_STEP_RETRIES}=        Set Variable                3
     ${last_failed_intent}=      Set Variable                ${EMPTY}
