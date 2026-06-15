@@ -589,7 +589,6 @@ Resolve Step Failure
     END
 
     # Build the Surgeon Prompt
-    # Build the Surgeon Prompt
     ${surgeon_prompt}=          Catenate
     ...                         You are an AI Surgeon tasked with fixing a broken test step.
     ...                         Original Goal: ${user_intent}
@@ -605,8 +604,8 @@ Resolve Step Failure
     ...                         {
     ...                           "escalate": false,
     ...                           "escalation_reason": "",
-    ...                           "recovery_steps": [ { "keyword": "...", "args": [], "kwargs": {} } ],
-    ...                           "corrected_steps": [ { "keyword": "...", "args": [], "kwargs": {} } ]
+    ...                           "recovery_steps": [ { "intent": "Describe the action", "keyword": "...", "args": [], "kwargs": {} } ],
+    ...                           "corrected_steps": [ { "intent": "Describe the action", "keyword": "...", "args": [], "kwargs": {} } ]
     ...                         }
     
     # Send to agent and retrieve the reply
