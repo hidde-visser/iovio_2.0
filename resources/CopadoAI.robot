@@ -588,6 +588,7 @@ Resolve Step Failure
     END
 
     # Build the Surgeon Prompt
+    # Build the Surgeon Prompt
     ${surgeon_prompt}=          Catenate
     ...                         You are an AI Surgeon tasked with fixing a broken test step.
     ...                         Original Goal: ${user_intent}
@@ -596,8 +597,17 @@ Resolve Step Failure
     ...                         Failure Mode: ${failure_mode}
     ...                         Execution History: ${executed_history_json}
     ...                         Remaining Steps: ${remaining_steps}
-    ...                         Please analyze the attached DOM context and provide a structured JSON response containing 'recovery_steps' or 'corrected_steps'.
-
+    ...                         Please analyze the attached DOM context and fix the broken step.
+    ...                         RULES:
+    ...                         1. You MUST output ONLY valid JSON. Do not output raw Robot Framework script or conversational text.
+    ...                         2. Your response must match this exact schema:
+    ...                         {
+    ...                           "escalate": false,
+    ...                           "escalation_reason": "",
+    ...                           "recovery_steps": [ { "keyword": "...", "args": [], "kwargs": {} } ],
+    ...                           "corrected_steps": [ { "keyword": "...", "args": [], "kwargs": {} } ]
+    ...                         }
+    
     # Send to agent and retrieve the reply
     Send Message To Agent       ${assistant_id}    ${DIALOGUE_ID}    ${surgeon_prompt}
     ${ai_reply}=                Retrieve Agent Reply
