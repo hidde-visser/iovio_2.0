@@ -257,7 +257,7 @@ Retrieve Agent Reply
 
 Compile Golden Path Script
     [Documentation]             Translates the JSON Golden Path into a pure Robot Framework script.
-...                         Formats the output with structural Settings, Suite Setup, Test Setup, and clean step breaks.
+    ...                         Formats the output with structural Settings, Suite Setup, Test Setup, and clean step breaks.
     [Arguments]                 ${DIALOGUE_ID}              ${assistant_id}=${NONE}
     
     ${four_spaces}=             Set Variable                ${SPACE}${SPACE}${SPACE}${SPACE}
