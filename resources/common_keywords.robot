@@ -16,6 +16,7 @@ Resource                        ../resources/CopadoAI.robot
 # IMPORTANT: Please read the readme.txt to understand needed variables and how to handle them!!
 ${BROWSER}                      chrome
 ${home_url}                     ${login_url}/lightning/page/home
+${SANDBOX}                      False
 
 
 *** Keywords ***
@@ -158,24 +159,24 @@ Run Agentic Test Scenario
 
     # ── FIX 4: DATA ISOLATION SUITE RESET ────────────────────────────────────
     # Reset tracking arrays so previous scenarios do not bleed into this execution thread
-    @{ALL_PROPOSED_STEPS}=          Create List
-    Set Suite Variable              @{ALL_PROPOSED_STEPS}
-    @{EXECUTION_HISTORY_PASSED}=    Create List
-    Set Suite Variable              @{EXECUTION_HISTORY_PASSED}
-    @{EXECUTION_HISTORY_FAILED}=    Create List
-    Set Suite Variable              @{EXECUTION_HISTORY_FAILED}
-    @{GOLDEN_PATH_SCRIPT}=          Create List
-    Set Suite Variable              @{GOLDEN_PATH_SCRIPT}
+    @{ALL_PROPOSED_STEPS}=      Create List
+    Set Suite Variable          @{ALL_PROPOSED_STEPS}
+    @{EXECUTION_HISTORY_PASSED}=                            Create List
+    Set Suite Variable          @{EXECUTION_HISTORY_PASSED}
+    @{EXECUTION_HISTORY_FAILED}=                            Create List
+    Set Suite Variable          @{EXECUTION_HISTORY_FAILED}
+    @{GOLDEN_PATH_SCRIPT}=      Create List
+    Set Suite Variable          @{GOLDEN_PATH_SCRIPT}
     # ─────────────────────────────────────────────────────────────────────────
 
     # Only attach the metadata file if a path was actually provided and exists.
     IF                          $metadata_json_path != $NONE and $metadata_json_path != '${EMPTY}'
         Log To Console          📦 Attaching Salesforce Org Metadata Contract...
-        Wait Until Keyword Succeeds                         10x       
-        ...                     2s                          Attach Document To Dialogue                  ${DIALOGUE_ID}    ${metadata_json_path}
+        Wait Until Keyword Succeeds                         10x
+        ...                     2s                          Attach Document To Dialogue                             ${DIALOGUE_ID}             ${metadata_json_path}
     END
 
-    ${ai_reply}=                Generate Initial Test Steps    
+    ${ai_reply}=                Generate Initial Test Steps
     ...                         ${assistant_id}             ${user_intent}
     ${active_steps}=            Extract Agent JSON Reply    ${ai_reply}
 
@@ -183,7 +184,7 @@ Run Agentic Test Scenario
     ${MAX_GLOBAL_RETRIES}=      Set Variable                50
     ${step_retries}=            Set Variable                0
     ${MAX_STEP_RETRIES}=        Set Variable                3
-    
+
     # ── FIX 2: CIRCUIT BREAKER INITIALIZATION ────────────────────────────────
     # Initialize tracker as an index integer instead of a volatile intent string
     ${last_failed_index}=       Set Variable                -2
@@ -222,21 +223,21 @@ Run Agentic Test Scenario
 
             Log To Console      ⚠️ AI Intervention Required. Mode: ${failure_mode}. Capturing DOM and Screenshot...
             ${dom_json_path}=                               Capture Page Elements
-            
+
             # --- Capture Screenshot ---
-            ${ts}=                                          Get Current Date            result_format=%Y%m%d_%H%M%S
+            ${ts}=              Get Current Date            result_format=%Y%m%d_%H%M%S
             ${screenshot_name}=                             Set Variable                failure_screenshot_${ts}.png
             ${screenshot_path}=                             Set Variable                ${OUTPUT_DIR}/${screenshot_name}
-            
-            LogScreenshot                                   ${screenshot_path}
-            Sleep                                           1s
+
+            LogScreenshot       ${screenshot_path}
+            Sleep               1s
             # -------------------------------
 
             ${remaining_steps}=                             Get Slice From List         ${active_steps}             ${failed_index + 1}
-            ${remaining_json}=                              Evaluate                    json.dumps($remaining_steps)                    json
+            ${remaining_json}=                              Evaluate                    json.dumps($remaining_steps)                           json
 
             # Serialize the successful step history to pass to the surgeon.
-            ${executed_history_json}=                       Evaluate                    json.dumps($EXECUTION_HISTORY_PASSED)           json
+            ${executed_history_json}=                       Evaluate                    json.dumps($EXECUTION_HISTORY_PASSED)                  json
 
             Log To Console      🏥 Calling AI Surgeon for recovery. Failure mode: ${failure_mode}
             ${ai_reply}=        Resolve Step Failure
@@ -245,7 +246,7 @@ Run Agentic Test Scenario
             ...                 ${error_msg}
             ...                 ${remaining_steps}
             ...                 ${dom_json_path}
-            ...                 ${screenshot_path}  
+            ...                 ${screenshot_path}
             ...                 ${executed_history_json}
             ...                 ${user_intent}
             ...                 ${failure_mode}
@@ -253,7 +254,7 @@ Run Agentic Test Scenario
             ${surgeon_payload}=                             Extract Agent JSON Reply    ${ai_reply}
 
             # ── FIX 1: NON-DICTIONARY TYPE GUARD ─────────────────────────────
-            ${is_dict}=                                     Evaluate                    isinstance($surgeon_payload, dict)
+            ${is_dict}=         Evaluate                    isinstance($surgeon_payload, dict)
             IF                  not ${is_dict}
                 Log To Console                              🛑 CRITICAL: AI Surgeon returned a non-dictionary payload type.
                 Fail            Agentic Loop Aborted: AI Surgeon layout breakdown. Value received: ${surgeon_payload}
@@ -267,19 +268,19 @@ Run Agentic Test Scenario
                 Fail            AI Escalated the test. Reason: ${reason}
             END
 
-            ${recovery_steps}=                              Get From Dictionary         ${surgeon_payload}          recovery_steps      default=@{EMPTY}
+            ${recovery_steps}=                              Get From Dictionary         ${surgeon_payload}          recovery_steps             default=@{EMPTY}
             IF                  ${recovery_steps}
                 Log To Console                              🩹 Executing Silent Recovery Steps...
                 FOR             ${rec_action}               IN                          @{recovery_steps}
-                    ${rec_kw}=                              Get From Dictionary         ${rec_action}               keyword    default=UNKNOWN_KEYWORD
-                    
-                    IF  '${rec_kw}' == 'UNKNOWN_KEYWORD'
-                        Log To Console    ⚠️ Skipping recovery step: AI returned malformed JSON missing 'keyword'.
+                    ${rec_kw}=                              Get From Dictionary         ${rec_action}               keyword                    default=UNKNOWN_KEYWORD
+
+                    IF          '${rec_kw}' == 'UNKNOWN_KEYWORD'
+                        Log To Console                      ⚠️ Skipping recovery step: AI returned malformed JSON missing 'keyword'.
                         CONTINUE
                     END
 
-                    ${rec_args}=                            Get From Dictionary         ${rec_action}               args                default=@{EMPTY}
-                    ${rec_kwa}=                             Get From Dictionary         ${rec_action}               kwargs              default=&{EMPTY}
+                    ${rec_args}=                            Get From Dictionary         ${rec_action}               args                       default=@{EMPTY}
+                    ${rec_kwa}=                             Get From Dictionary         ${rec_action}               kwargs                     default=&{EMPTY}
                     Log To Console                          \ \ \ \ ${rec_kw}
                     Run Keyword And Ignore Error            ${rec_kw}                   @{rec_args}                 &{rec_kwa}
                 END
@@ -294,6 +295,6 @@ Run Agentic Test Scenario
         END
 
     FINALLY
-        # Pass the active assistant_id to ensure the compiler doesn't hit a 502 workspace error
-        Compile Golden Path Script                          ${DIALOGUE_ID}    ${assistant_id}
+    # Pass the active assistant_id to ensure the compiler doesn't hit a 502 workspace error
+        Compile Golden Path Script                          ${DIALOGUE_ID}              ${assistant_id}
     END
