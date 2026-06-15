@@ -218,10 +218,20 @@ Run Agentic Test Scenario
                 Log To Console                              🛑 FATAL: Stuck looping on step index [${failed_index}] 3 consecutive times.
                 Log To Console                              Mode: ${failure_mode}.
                 Log To Console                              Error: ${error_msg}
-                
-                # Check if the user intent implies negative/validation testing
-                ${is_negative_test}=                        Evaluate                    any(w in $user_intent.lower() for w in ['exceed', 'limit', 'error', 'validation', 'invalid', 'boundary'])
-                
+
+                # Pure Robot Framework replacement to verify negative testing intent
+                ${user_intent_lower}=                       Convert To Lower Case       ${user_intent}
+                ${is_negative_test}=                        Set Variable                ${False}
+                @{boundary_words}=                          Create List                 exceed                      limit                      error                 validation             invalid    boundary
+
+                FOR             ${word}                     IN                          @{boundary_words}
+                    ${contains}=                            Run Keyword And Return Status                           Should Contain             ${user_intent_lower}             ${word}
+                    IF          ${contains}
+                        ${is_negative_test}=                Set Variable                ${True}
+                        BREAK
+                    END
+                END
+
                 IF              ${is_negative_test}
                     Fail        Potential Defect Found: AI stuck looping on verification step. Expected application to enforce validation limits/error banners, but the operation proceeded and application state shifted. Intent: ${user_intent}
                 ELSE
