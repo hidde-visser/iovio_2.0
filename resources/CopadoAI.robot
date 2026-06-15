@@ -593,6 +593,7 @@ Resolve Step Failure
     ...                         ${error_message}
     ...                         ${remaining_steps}
     ...                         ${dom_json_path}
+    ...                         ${screenshot_path}          # <--- NEW ARGUMENT
     ...                         ${executed_history_json}
     ...                         ${user_intent}
     ...                         ${failure_mode}=HARD_KEYWORD_ERROR
@@ -609,6 +610,12 @@ Resolve Step Failure
         Attach Document To Dialogue    ${dom_json_path}    ${DIALOGUE_ID}
     END
 
+    # --- NEW: Attach the Screenshot if available ---
+    IF  '${screenshot_path}' != '${NONE}'
+        Attach Document To Dialogue    ${screenshot_path}    ${DIALOGUE_ID}
+    END
+    # -----------------------------------------------
+
     # Build the Surgeon Prompt
     ${surgeon_prompt}=          Catenate
     ...                         You are an AI Surgeon tasked with fixing a broken test step.
@@ -618,16 +625,7 @@ Resolve Step Failure
     ...                         Failure Mode: ${failure_mode}
     ...                         Execution History: ${executed_history_json}
     ...                         Remaining Steps: ${remaining_steps}
-    ...                         Please analyze the attached DOM context and fix the broken step.
-    ...                         RULES:
-    ...                         1. You MUST output ONLY valid JSON. Do not output raw Robot Framework script or conversational text.
-    ...                         2. Your response must match this exact schema:
-    ...                         {
-    ...                           "escalate": false,
-    ...                           "escalation_reason": "",
-    ...                           "recovery_steps": [ { "intent": "Describe the action", "keyword": "...", "args": [], "kwargs": {} } ],
-    ...                           "corrected_steps": [ { "intent": "Describe the action", "keyword": "...", "args": [], "kwargs": {} } ]
-    ...                         }
+    ...                         Please analyze the attached DOM context AND the visual screenshot to fix the broken step.
     
     # Send to agent and retrieve the reply
     Send Message To Agent       ${assistant_id}    ${DIALOGUE_ID}    ${surgeon_prompt}
