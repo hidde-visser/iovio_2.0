@@ -112,29 +112,41 @@ def find_json_start(text: str) -> int:
 
 def parse_ai_json_reply(raw_text: str):
     """
-    Full pipeline: sanitize then parse.
-
-    Returns the decoded Python object (dict or list).
-    Raises ValueError with a clear diagnostic message on failure,
-    including the character position and surrounding context.
+    Full pipeline: sanitize then parse using an iterative trial-decoding strategy
+    to tolerate conversational text containing false-positive braces (e.g., '{EMPTY}').
     """
-    sanitized  = sanitize_ai_json_reply(raw_text)
-    start_idx  = find_json_start(sanitized)
-    clean_suffix = sanitized[start_idx:]
-
-    try:
-        parsed, _ = json.JSONDecoder().raw_decode(clean_suffix)
-        return parsed
-    except json.JSONDecodeError as exc:
-        char_pos      = exc.pos
-        context_start = max(0, char_pos - 60)
-        context_end   = min(len(clean_suffix), char_pos + 60)
-        snippet       = clean_suffix[context_start:context_end]
+    sanitized = sanitize_ai_json_reply(raw_text)
+    
+    # Locate all potential JSON structure opening boundaries ({ or [)
+    start_candidates = [i for i, ch in enumerate(sanitized) if ch in ('{', '[')]
+    
+    if not start_candidates:
         raise ValueError(
-            f"JSONDecodeError at char {char_pos}: {exc.msg}\n"
-            f"Context: ...{snippet!r}..."
-        ) from exc
-
+            "Parser Error: No JSON structure found in AI reply. "
+            f"Raw text starts with: {sanitized[:200]!r}"
+        )
+        
+    errors = []
+    # Iteratively attempt decoding from each start candidate position
+    for start_idx in start_candidates:
+        clean_suffix = sanitized[start_idx:]
+        try:
+            parsed, _ = json.JSONDecoder().raw_decode(clean_suffix)
+            return parsed  # Return immediately upon the first successful parse
+        except json.JSONDecodeError as exc:
+            errors.append((start_idx, exc, clean_suffix))
+            continue
+            
+    # Fallback: If all candidates failed to parse, surface the error context of the first candidate
+    primary_idx, primary_exc, primary_suffix = errors[0]
+    char_pos = primary_exc.pos
+    context_start = max(0, char_pos - 60)
+    context_end = min(len(primary_suffix), char_pos + 60)
+    snippet = primary_suffix[context_start:context_end]
+    raise ValueError(
+        f"JSONDecodeError at char {char_pos}: {primary_exc.msg}\n"
+        f"Context: ...{snippet!r}..."
+    )
 
 def escape_xpath_arg(arg: str) -> str:
     """
