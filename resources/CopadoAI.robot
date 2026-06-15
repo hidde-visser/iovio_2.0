@@ -347,7 +347,7 @@ Compile Golden Path Script
     ${script_content}=          Set Variable                *** Test Cases ***\nAgentic Generated Test\n
 
     FOR                         ${action}                   IN                          @{GOLDEN_PATH_SCRIPT}
-        ${keyword}=             Get From Dictionary         ${action}                   keyword
+        ${keyword}=             Get From Dictionary         ${action}                   keyword    default=# MISSING_KEYWORD
         ${args}=                Get From Dictionary         ${action}                   args                        default=@{EMPTY}
         ${kwargs}=              Get From Dictionary         ${action}                   kwargs                      default=&{EMPTY}
 
