@@ -34,18 +34,18 @@ End suite
     Close All Browsers
 
 UI Login Via JWT
-    [Documentation]     Opens browser and logs in via JWT frontdoor.jsp — no password screen.
-    ...                 Uses CLIENT_ID, USERNAME, SERVER_KEY and SANDBOX from Project Settings.
-    OpenBrowser         about:blank                 ${BROWSER}
-    SetConfig           DefaultTimeout              45s
-    SetConfig           LineBreak                   ${EMPTY}
-    JwtAuthenticate     ${CLIENT_ID}                ${USERNAME}                 ${SERVER_KEY}    sandbox=${SANDBOX}
-    JwtLogin            /lightning/page/home
+    [Documentation]             Opens browser and logs in via JWT frontdoor.jsp — no password screen.
+    ...                         Uses CLIENT_ID, USERNAME, SERVER_KEY and SANDBOX from Project Settings.
+    OpenBrowser                 about:blank                 ${BROWSER}
+    SetConfig                   DefaultTimeout              45s
+    SetConfig                   LineBreak                   ${EMPTY}
+    JwtAuthenticate             ${CLIENT_ID}                ${USERNAME}                 ${SERVER_KEY}               sandbox=${SANDBOX}
+    JwtLogin                    /lightning/page/home
 
 Login
     [Documentation]             Login to Salesforce instance. Takes instance_url, username and password as
     ...                         arguments. Uses values given in Copado Robotic Testing's variables section by default.
-    [Arguments]                 ${sf_instance_url}=${login_url}                         ${sf_username}=${username}                      ${sf_password}=${password}
+    [Arguments]                 ${sf_instance_url}=${login_url}                         ${sf_username}=${username}                             ${sf_password}=${password}
     GoTo                        ${sf_instance_url}
     TypeText                    Username                    ${sf_username}              delay=1
     TypeSecret                  Password                    ${sf_password}
@@ -53,8 +53,8 @@ Login
     # We'll check if variable ${secret} is given. If yes, fill the MFA dialog.
     # If not, MFA is not expected.
     # ${secret} is ${None} unless specifically given.
-    ${MFA_needed}=              Run Keyword And Return Status                           Should Not Be Equal         ${None}             ${secret}
-    Run Keyword If              ${MFA_needed}               Fill MFA                    ${sf_username}              ${secret}           ${sf_instance_url}
+    ${MFA_needed}=              Run Keyword And Return Status                           Should Not Be Equal         ${None}                    ${secret}
+    Run Keyword If              ${MFA_needed}               Fill MFA                    ${sf_username}              ${secret}                  ${sf_instance_url}
 
 
 Login As
@@ -83,7 +83,7 @@ Fill MFA
 Home
     [Documentation]             Example appstarte: Navigate to homepage, login if needed
     GoTo                        ${home_url}
-    ${login_status} =           IsText                      To access this page, you have to log in to Salesforce.                      2
+    ${login_status} =           IsText                      To access this page, you have to log in to Salesforce.                             2
     Run Keyword If              ${login_status}             Login
     ClickText                   Home
     VerifyTitle                 Home | Salesforce
@@ -164,7 +164,7 @@ Run Agentic Test Scenario
     # Only attach the metadata file if a path was actually provided and exists.
     IF                          $metadata_json_path != $NONE and $metadata_json_path != '${EMPTY}'
         Log To Console          📦 Attaching Salesforce Org Metadata Contract...
-        Wait Until Keyword Succeeds                         10x                         2s                          Attach Document To Dialogue                  ${DIALOGUE_ID}    ${metadata_json_path}
+        Wait Until Keyword Succeeds                         10x                         2s                          Attach Document To Dialogue                         ${DIALOGUE_ID}    ${metadata_json_path}
     END
 
     ${ai_reply}=                Generate Initial Test Steps                             ${assistant_id}             ${user_intent}
@@ -212,24 +212,24 @@ Run Agentic Test Scenario
 
             Log To Console      ⚠️ AI Intervention Required. Mode: ${failure_mode}. Capturing DOM and Screenshot...
             ${dom_json_path}=                               Capture Page Elements
-            
+
             # --- NEW: Capture Screenshot ---
-            ${ts}=                                          Get Current Date            result_format=%Y%m%d_%H%M%S
+            ${ts}=              Get Current Date            result_format=%Y%m%d_%H%M%S
             ${screenshot_name}=                             Set Variable                failure_screenshot_${ts}.png
             ${screenshot_path}=                             Set Variable                ${OUTPUT_DIR}/${screenshot_name}
-            
+
             # Pass the full absolute path so we know exactly where it saves
-            LogScreenshot                                   ${screenshot_path}
-            
+            LogScreenshot       ${screenshot_path}
+
             # Wait 1 second to ensure the file is completely written to disk
-            Sleep                                           1s
+            Sleep               1s
             # -------------------------------
 
             ${remaining_steps}=                             Get Slice From List         ${active_steps}             ${failed_index + 1}
-            ${remaining_json}=                              Evaluate                    json.dumps($remaining_steps)                    json
+            ${remaining_json}=                              Evaluate                    json.dumps($remaining_steps)                           json
 
             # Serialize the successful step history (with URL metadata) to pass to the surgeon.
-            ${executed_history_json}=                       Evaluate                    json.dumps($EXECUTION_HISTORY_PASSED)           json
+            ${executed_history_json}=                       Evaluate                    json.dumps($EXECUTION_HISTORY_PASSED)                  json
 
             Log To Console      🏥 Calling AI Surgeon for recovery. Failure mode: ${failure_mode}
             ${ai_reply}=        Resolve Step Failure
@@ -243,7 +243,16 @@ Run Agentic Test Scenario
             ...                 ${user_intent}
             ...                 ${failure_mode}
 
+            # Inside resources/common_keywords.robot -> Run Agentic Test Scenario
             ${surgeon_payload}=                             Extract Agent JSON Reply    ${ai_reply}
+
+            # --- ADD THIS TYPE CHECK GUARD ---
+            ${is_dict}=         Evaluate                    isinstance($surgeon_payload, dict)
+            IF                  not ${is_dict}
+                Fail            ❌ AI Surgeon returned an invalid structure (expected JSON dictionary, got: ${surgeon_payload}). Aborting loop.
+            END
+            # ---------------------------------
+
             ${escalate}=        Get From Dictionary         ${surgeon_payload}          escalate                    default=${False}
             IF                  ${escalate}
                 ${reason}=      Get From Dictionary         ${surgeon_payload}          escalation_reason
@@ -251,21 +260,21 @@ Run Agentic Test Scenario
                 Fail            AI Escalated the test. Reason: ${reason}
             END
 
-            ${recovery_steps}=                              Get From Dictionary         ${surgeon_payload}          recovery_steps      default=@{EMPTY}
+            ${recovery_steps}=                              Get From Dictionary         ${surgeon_payload}          recovery_steps             default=@{EMPTY}
             IF                  ${recovery_steps}
                 Log To Console                              🩹 Executing Silent Recovery Steps...
                 FOR             ${rec_action}               IN                          @{recovery_steps}
-                    # ADD DEFAULT HERE
-                    ${rec_kw}=                              Get From Dictionary         ${rec_action}               keyword    default=UNKNOWN_KEYWORD
-                    
+                # ADD DEFAULT HERE
+                    ${rec_kw}=                              Get From Dictionary         ${rec_action}               keyword                    default=UNKNOWN_KEYWORD
+
                     # ADD SAFETY CHECK
-                    IF  '${rec_kw}' == 'UNKNOWN_KEYWORD'
-                        Log To Console    ⚠️ Skipping recovery step: AI returned malformed JSON missing 'keyword'.
+                    IF          '${rec_kw}' == 'UNKNOWN_KEYWORD'
+                        Log To Console                      ⚠️ Skipping recovery step: AI returned malformed JSON missing 'keyword'.
                         CONTINUE
                     END
 
-                    ${rec_args}=                            Get From Dictionary         ${rec_action}               args                default=@{EMPTY}
-                    ${rec_kwa}=                             Get From Dictionary         ${rec_action}               kwargs              default=&{EMPTY}
+                    ${rec_args}=                            Get From Dictionary         ${rec_action}               args                       default=@{EMPTY}
+                    ${rec_kwa}=                             Get From Dictionary         ${rec_action}               kwargs                     default=&{EMPTY}
                     Log To Console                          \ \ \ \ ${rec_kw}
                     Run Keyword And Ignore Error            ${rec_kw}                   @{rec_args}                 &{rec_kwa}
                 END
