@@ -294,5 +294,6 @@ Run Agentic Test Scenario
         END
 
     FINALLY
-        Compile Golden Path Script                          ${DIALOGUE_ID}
+        # Pass the active assistant_id to ensure the compiler doesn't hit a 502 workspace error
+        Compile Golden Path Script                          ${DIALOGUE_ID}    ${assistant_id}
     END
