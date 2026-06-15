@@ -148,15 +148,7 @@ Capture Page Elements
     RETURN                      ${target_path}
 Run Agentic Test Scenario
     [Documentation]             Top-level orchestrator for the agentic test execution loop.
-    ...
-    ...                         v3 changes:
-    ...                         - Passes ${user_intent} into Execute Agentic JSON Steps so it
-    ...                         flows all the way through to Resolve Step Failure and the surgeon
-    ...                         prompt. The surgeon now always knows the original test goal.
-    ...                         - Execute Agentic JSON Steps returns 5 values. The 5th value is
-    ...                         ${failure_mode} (HARD_KEYWORD_ERROR or SILENT_APP_ERROR).
-    ...                         - ${failure_mode} is forwarded to Resolve Step Failure so the
-    ...                         surgeon prompt is tailored to the correct failure class.
+    ...                         Unified with Fix 1 (Type Guard) and Fix 2 (Index Circuit Breaker).
     [Arguments]                 ${assistant_id}             ${user_intent}              ${metadata_json_path}=${NONE}
 
     Log To Console              🚀 Starting Agentic Scenario for Intent: ${user_intent}
@@ -164,26 +156,30 @@ Run Agentic Test Scenario
     # Only attach the metadata file if a path was actually provided and exists.
     IF                          $metadata_json_path != $NONE and $metadata_json_path != '${EMPTY}'
         Log To Console          📦 Attaching Salesforce Org Metadata Contract...
-        Wait Until Keyword Succeeds                         10x                         2s                          Attach Document To Dialogue                         ${DIALOGUE_ID}    ${metadata_json_path}
+        Wait Until Keyword Succeeds                         10x       
+        ...                     2s                          Attach Document To Dialogue                  ${DIALOGUE_ID}    ${metadata_json_path}
     END
 
-    ${ai_reply}=                Generate Initial Test Steps                             ${assistant_id}             ${user_intent}
+    ${ai_reply}=                Generate Initial Test Steps    
+    ...                         ${assistant_id}             ${user_intent}
     ${active_steps}=            Extract Agent JSON Reply    ${ai_reply}
 
     ${global_retries}=          Set Variable                0
     ${MAX_GLOBAL_RETRIES}=      Set Variable                50
     ${step_retries}=            Set Variable                0
     ${MAX_STEP_RETRIES}=        Set Variable                3
-    ${last_failed_intent}=      Set Variable                ${EMPTY}
+    
+    # ── FIX 2: CIRCUIT BREAKER INITIALIZATION ────────────────────────────────
+    # Initialize tracker as an index integer instead of a volatile intent string
+    ${last_failed_index}=       Set Variable                -2
+    # ─────────────────────────────────────────────────────────────────────────
 
     TRY
         WHILE                   ${global_retries} < ${MAX_GLOBAL_RETRIES}
 
             Log To Console      ▶️ Executing Active Step Queue...
 
-            # Execute Agentic JSON Steps returns 5 values:
-            # status, failed_step, error_msg, failed_index, failure_mode
-            # ${user_intent} is passed so it flows through to the surgeon prompt.
+            # Execute Agentic JSON Steps returns 5 values
             ${status}           ${failed_step}              ${error_msg}                ${failed_index}
             ...                 ${failure_mode}=            Execute Agentic JSON Steps
             ...                 ${active_steps}
@@ -194,42 +190,39 @@ Run Agentic Test Scenario
                 BREAK
             END
 
-            # ── SAFE RETRY CIRCUIT BREAKERS ──────────────────────────────────
-            ${current_intent}=                              Get From Dictionary         ${failed_step}              intent
-
-            IF                  $current_intent == $last_failed_intent
+            # ── FIX 2: INDEX-BASED CIRCUIT BREAKER RETRY EVALUATION ──────────
+            # Instead of tracking volatile text descriptions, evaluate the specific step array index.
+            IF                  $failed_index == $last_failed_index
                 ${step_retries}=                            Evaluate                    ${step_retries} + 1
             ELSE
                 ${step_retries}=                            Set Variable                1
-                ${last_failed_intent}=                      Set Variable                ${current_intent}
+                ${last_failed_index}=                       Set Variable                ${failed_index}
             END
 
             IF                  ${step_retries} >= ${MAX_STEP_RETRIES}
-                Log To Console                              🛑 FATAL: Failed on '${current_intent}' 3 times. Mode: ${failure_mode}. Error: ${error_msg}
+                Log To Console                              🛑 FATAL: Stuck looping on step index [${failed_index}] 3 consecutive times.
+                Log To Console                              Mode: ${failure_mode}. Error: ${error_msg}
                 Fail            Agentic Loop Aborted: AI is looping or blocked by Business Logic.
             END
             # ─────────────────────────────────────────────────────────────────
 
             Log To Console      ⚠️ AI Intervention Required. Mode: ${failure_mode}. Capturing DOM and Screenshot...
             ${dom_json_path}=                               Capture Page Elements
-
-            # --- NEW: Capture Screenshot ---
-            ${ts}=              Get Current Date            result_format=%Y%m%d_%H%M%S
+            
+            # --- Capture Screenshot ---
+            ${ts}=                                          Get Current Date            result_format=%Y%m%d_%H%M%S
             ${screenshot_name}=                             Set Variable                failure_screenshot_${ts}.png
             ${screenshot_path}=                             Set Variable                ${OUTPUT_DIR}/${screenshot_name}
-
-            # Pass the full absolute path so we know exactly where it saves
-            LogScreenshot       ${screenshot_path}
-
-            # Wait 1 second to ensure the file is completely written to disk
-            Sleep               1s
+            
+            LogScreenshot                                   ${screenshot_path}
+            Sleep                                           1s
             # -------------------------------
 
             ${remaining_steps}=                             Get Slice From List         ${active_steps}             ${failed_index + 1}
-            ${remaining_json}=                              Evaluate                    json.dumps($remaining_steps)                           json
+            ${remaining_json}=                              Evaluate                    json.dumps($remaining_steps)                    json
 
-            # Serialize the successful step history (with URL metadata) to pass to the surgeon.
-            ${executed_history_json}=                       Evaluate                    json.dumps($EXECUTION_HISTORY_PASSED)                  json
+            # Serialize the successful step history to pass to the surgeon.
+            ${executed_history_json}=                       Evaluate                    json.dumps($EXECUTION_HISTORY_PASSED)           json
 
             Log To Console      🏥 Calling AI Surgeon for recovery. Failure mode: ${failure_mode}
             ${ai_reply}=        Resolve Step Failure
@@ -238,20 +231,21 @@ Run Agentic Test Scenario
             ...                 ${error_msg}
             ...                 ${remaining_steps}
             ...                 ${dom_json_path}
-            ...                 ${screenshot_path}          # <--- THIS IS THE MISSING PIECE!
+            ...                 ${screenshot_path}  
             ...                 ${executed_history_json}
             ...                 ${user_intent}
             ...                 ${failure_mode}
 
-            # Inside resources/common_keywords.robot -> Run Agentic Test Scenario
             ${surgeon_payload}=                             Extract Agent JSON Reply    ${ai_reply}
 
-            # --- ADD THIS TYPE CHECK GUARD ---
-            ${is_dict}=         Evaluate                    isinstance($surgeon_payload, dict)
+            # ── FIX 1: NON-DICTIONARY TYPE GUARD ─────────────────────────────
+            # Safely intercept malformed non-dictionary structures before they hit Mapping conversion actions
+            ${is_dict}=                                     Evaluate                    isinstance($surgeon_payload, dict)
             IF                  not ${is_dict}
-                Fail            ❌ AI Surgeon returned an invalid structure (expected JSON dictionary, got: ${surgeon_payload}). Aborting loop.
+                Log To Console                              🛑 CRITICAL: AI Surgeon returned a non-dictionary payload type.
+                Fail            Agentic Loop Aborted: AI Surgeon layout breakdown. Value received: ${surgeon_payload}
             END
-            # ---------------------------------
+            # ─────────────────────────────────────────────────────────────────
 
             ${escalate}=        Get From Dictionary         ${surgeon_payload}          escalate                    default=${False}
             IF                  ${escalate}
@@ -260,21 +254,19 @@ Run Agentic Test Scenario
                 Fail            AI Escalated the test. Reason: ${reason}
             END
 
-            ${recovery_steps}=                              Get From Dictionary         ${surgeon_payload}          recovery_steps             default=@{EMPTY}
+            ${recovery_steps}=                              Get From Dictionary         ${surgeon_payload}          recovery_steps      default=@{EMPTY}
             IF                  ${recovery_steps}
                 Log To Console                              🩹 Executing Silent Recovery Steps...
                 FOR             ${rec_action}               IN                          @{recovery_steps}
-                # ADD DEFAULT HERE
-                    ${rec_kw}=                              Get From Dictionary         ${rec_action}               keyword                    default=UNKNOWN_KEYWORD
-
-                    # ADD SAFETY CHECK
-                    IF          '${rec_kw}' == 'UNKNOWN_KEYWORD'
-                        Log To Console                      ⚠️ Skipping recovery step: AI returned malformed JSON missing 'keyword'.
+                    ${rec_kw}=                              Get From Dictionary         ${rec_action}               keyword    default=UNKNOWN_KEYWORD
+                    
+                    IF  '${rec_kw}' == 'UNKNOWN_KEYWORD'
+                        Log To Console    ⚠️ Skipping recovery step: AI returned malformed JSON missing 'keyword'.
                         CONTINUE
                     END
 
-                    ${rec_args}=                            Get From Dictionary         ${rec_action}               args                       default=@{EMPTY}
-                    ${rec_kwa}=                             Get From Dictionary         ${rec_action}               kwargs                     default=&{EMPTY}
+                    ${rec_args}=                            Get From Dictionary         ${rec_action}               args                default=@{EMPTY}
+                    ${rec_kwa}=                             Get From Dictionary         ${rec_action}               kwargs              default=&{EMPTY}
                     Log To Console                          \ \ \ \ ${rec_kw}
                     Run Keyword And Ignore Error            ${rec_kw}                   @{rec_args}                 &{rec_kwa}
                 END
