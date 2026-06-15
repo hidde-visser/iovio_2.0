@@ -612,16 +612,18 @@ Resolve Step Failure
 
     # -----------------------------------------------
 
-    # Build the Surgeon Prompt
+    # Read the image and encode it to Base64
+    ${base64_image}=            Evaluate                    __import__('base64').b64encode(open(r'${screenshot_path}', 'rb').read()).decode('utf-8')
+    ${markdown_image}=          Set Variable                \n\n![Screenshot](data:image/png;base64,${base64_image})
+
+    # Append it to your prompt
     ${surgeon_prompt}=          Catenate
     ...                         You are an AI Surgeon tasked with fixing a broken test step.
     ...                         Original Goal: ${user_intent}
     ...                         Failed Step: ${failed_step}
     ...                         Error Encountered: ${error_message}
-    ...                         Failure Mode: ${failure_mode}
-    ...                         Execution History: ${executed_history_json}
-    ...                         Remaining Steps: ${remaining_steps}
-    ...                         Please analyze the attached DOM context AND the visual screenshot to fix the broken step.
+    ...                         Please analyze the attached DOM context AND the visual screenshot below.
+    ...                         ${markdown_image}
     
     # Send to agent and retrieve the reply
     Send Message To Agent       ${assistant_id}    ${DIALOGUE_ID}    ${surgeon_prompt}
