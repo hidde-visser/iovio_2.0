@@ -257,25 +257,42 @@ Retrieve Agent Reply
 
 Compile Golden Path Script
     [Documentation]             Translates the JSON Golden Path into a pure Robot Framework script.
-    ...                         Injects raw file contents into the agent prompt via parameters to bypass local filesystem barriers.
+    ...                         Formats the output with structural Settings, Suite Setup, and clean step breaks.
     [Arguments]                 ${DIALOGUE_ID}              ${assistant_id}=${NONE}
-    ${script_content}=          Set Variable                *** Test Cases ***\nAgentic Generated Test\n\ \ \ \ UI Login Via JWT\n
+    
+    ${four_spaces}=             Set Variable                ${SPACE}${SPACE}${SPACE}${SPACE}
+    
+    # ── BUILD THE CORRECT ROBOT FRAMEWORK HEADERS ────────────────────────────
+    ${settings_block}=          Set Variable                *** Settings ***\nResource${four_spaces}../resources/common_keywords.robot\nSuite Setup${four_spaces}UI Login Via JWT\n\n
+    ${test_cases_block}=        Set Variable                *** Test Cases ***\nAgentic Generated Test\n
+    ${script_content}=          Set Variable                ${settings_block}${test_cases_block}
+    # ─────────────────────────────────────────────────────────────────────────
 
     FOR                         ${action}                   IN                          @{GOLDEN_PATH_SCRIPT}
         ${keyword}=             Get From Dictionary         ${action}                   keyword                     default=# MISSING_KEYWORD
         ${args}=                Get From Dictionary         ${action}                   args                        default=@{EMPTY}
         ${kwargs}=              Get From Dictionary         ${action}                   kwargs                      default=&{EMPTY}
-        ${step_string}=         Set Variable                \ \ \ \ ${keyword}
 
+        # Skip adding inline logins since it is now safely handled by the Suite Setup
+        IF                      '${keyword}' == 'UI Login Via JWT' or '${keyword}' == 'Login'
+            CONTINUE
+        END
+
+        # Start the step with 4 spaces indentation
+        ${step_string}=         Set Variable                ${four_spaces}${keyword}
+
+        # Append positional arguments separated by 4 spaces
         FOR                     ${arg}                      IN                          @{args}
-            ${step_string}=     Catenate                    SEPARATOR\=${SPACE}${SPACE}${SPACE}${SPACE}             ${step_string}             ${arg}
+            ${step_string}=     Catenate                    SEPARATOR\=${four_spaces}             ${step_string}             ${arg}
         END
 
+        # Append keyword arguments separated by 4 spaces
         FOR                     ${key}                      ${val}                      IN                          &{kwargs}
-            ${step_string}=     Catenate                    SEPARATOR\=${SPACE}${SPACE}${SPACE}${SPACE}             ${step_string}             ${key}=${val}
+            ${step_string}=     Catenate                    SEPARATOR\=${four_spaces}             ${step_string}             ${key}=${val}
         END
 
-        ${script_content}=      Catenate                    ${script_content}           ${step_string}
+        # Append the complete formatted line with a trailing explicit newline character (\n)
+        ${script_content}=      Set Variable                ${script_content}${step_string}\n
     END
 
     Log To Console              🌟 COMPILED GOLDEN PATH SCRIPT 🌟
@@ -293,13 +310,11 @@ Compile Golden Path Script
         ${TARGET_ASSISTANT_ID}=  Get Agent ID By Name        Orchestrate Agent           ${CLEAN_WSPACE}
     END
     
-    # ── VARIABLES APPLIED TO INJECTION PROMPT (FIX 4 REFAC) ──────────────────
     ${agent_prompt}=            Catenate
     ...                         Please create a new file named "${file_name}" inside the "tests/" folder of the Test Job "${TEST_JOB_NAME}" (ID: ${TEST_JOB_ID}) within Project "${PROJECT_NAME}" (ID: ${PROJECT_ID}).\n\n
     ...                         Here is the exact file content you must write:\n
     ...                         ${script_content}\n\n
     ...                         Do not attempt to read local filesystem paths and do not pause to ask for human confirmation. Use your internal file upload/creation tools to commit this content immediately.
-    # ─────────────────────────────────────────────────────────────────────────
     
     Send Message To Agent       ${TARGET_ASSISTANT_ID}      ${DIALOGUE_ID}              ${agent_prompt}
     ${ignore_reply}=            Retrieve Agent Reply
