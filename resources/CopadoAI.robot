@@ -48,7 +48,7 @@ Send Message To Agent
     ...                         exponential backoff.
     [Arguments]                 ${target_assistant_id}      ${DIALOGUE_ID}
     ...                         ${prompt}
-    ...                         ${max_retries}=10
+    ...                         ${max_retries}=50
     ...                         ${backoff_base}=10
 
     ${msg_uuid}=                Evaluate                    str(uuid.uuid4())           modules=uuid
