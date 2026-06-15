@@ -593,7 +593,7 @@ Resolve Step Failure
     ...                         ${error_message}
     ...                         ${remaining_steps}
     ...                         ${dom_json_path}
-    ...                         ${screenshot_path}          # <--- NEW ARGUMENT
+    ...                         ${screenshot_path}
     ...                         ${executed_history_json}
     ...                         ${user_intent}
     ...                         ${failure_mode}=HARD_KEYWORD_ERROR
@@ -605,25 +605,40 @@ Resolve Step Failure
     ${DIALOGUE_ID}              Create Dialogue Thread      ${assistant_id}
     Log To Console              ✅ Surgeon dialogue created: ${DIALOGUE_ID}
 
-    # Attach the DOM state if available
+    # Attach the DOM state if available (This still goes to /documents)
     IF  '${dom_json_path}' != '${NONE}'
         Attach Document To Dialogue    ${dom_json_path}    ${DIALOGUE_ID}
     END
 
-    # -----------------------------------------------
+    # --- NEW: Convert Screenshot to Base64 Markdown ---
+    ${markdown_image}=          Set Variable                ${EMPTY}
+    IF  '${screenshot_path}' != '${NONE}'
+        Log To Console          📸 Encoding failure screenshot for AI Vision...
+        ${base64_image}=        Evaluate                    __import__('base64').b64encode(open(r'${screenshot_path}', 'rb').read()).decode('utf-8')
+        # We format it exactly how the Copado UI does
+        ${markdown_image}=      Set Variable                \n\n![Screenshot](data:image/png;base64,${base64_image})
+    END
+    # --------------------------------------------------
 
-    # Read the image and encode it to Base64
-    ${base64_image}=            Evaluate                    __import__('base64').b64encode(open(r'${screenshot_path}', 'rb').read()).decode('utf-8')
-    ${markdown_image}=          Set Variable                \n\n![Screenshot](data:image/png;base64,${base64_image})
-
-    # Append it to your prompt
+    # Build the Surgeon Prompt
     ${surgeon_prompt}=          Catenate
     ...                         You are an AI Surgeon tasked with fixing a broken test step.
     ...                         Original Goal: ${user_intent}
     ...                         Failed Step: ${failed_step}
     ...                         Error Encountered: ${error_message}
-    ...                         Please analyze the attached DOM context AND the visual screenshot below.
-    ...                         ${markdown_image}
+    ...                         Failure Mode: ${failure_mode}
+    ...                         Execution History: ${executed_history_json}
+    ...                         Remaining Steps: ${remaining_steps}
+    ...                         Please analyze the attached DOM context AND the visual screenshot below to fix the broken step.
+    ...                         RULES:
+    ...                         1. You MUST output ONLY valid JSON. Do not output raw Robot Framework script or conversational text.
+    ...                         2. Your response must match this exact schema:
+    ...                         {
+    ...                           "escalate": false,
+    ...                           "escalation_reason": "",
+    ...                           "recovery_steps": [ { "intent": "Describe the action", "keyword": "...", "args": [], "kwargs": {} } ],
+    ...                           "corrected_steps": [ { "intent": "Describe the action", "keyword": "...", "args": [], "kwargs": {} } ]
+    ...                         }${markdown_image}
     
     # Send to agent and retrieve the reply
     Send Message To Agent       ${assistant_id}    ${DIALOGUE_ID}    ${surgeon_prompt}
