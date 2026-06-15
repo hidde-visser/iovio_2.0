@@ -267,10 +267,21 @@ Attach Document To Dialogue
     ${absolute_path}=           Normalize Path              ${file_path}
     Should Exist                ${absolute_path}
 
+    # ${file_name}=               Fetch From Right            ${absolute_path}            /
+    # ${file_handle}=             Evaluate                    open($absolute_path, 'rb')
+    # # ${file_tuple}=            Create List                 ${file_name}                ${file_handle}              application/octet-stream
+    # ${file_tuple}=              Create List                 ${file_name}                ${file_handle}              application/json
+    # ${file_obj}=                Create Dictionary           file=${file_tuple}
+    
     ${file_name}=               Fetch From Right            ${absolute_path}            /
     ${file_handle}=             Evaluate                    open($absolute_path, 'rb')
-    # ${file_tuple}=            Create List                 ${file_name}                ${file_handle}              application/octet-stream
-    ${file_tuple}=              Create List                 ${file_name}                ${file_handle}              application/json
+    
+    # --- NEW: Dynamic MIME Type detection ---
+    ${ext}=                     Evaluate                    '${file_name}'.split('.')[-1].lower()
+    ${mime_type}=               Evaluate                    'image/png' if '${ext}' in ['png', 'jpg', 'jpeg'] else 'application/json'
+    ${file_tuple}=              Create List                 ${file_name}                ${file_handle}              ${mime_type}
+    # ----------------------------------------
+    
     ${file_obj}=                Create Dictionary           file=${file_tuple}
 
     ${upload_headers}=          Create Dictionary           accept=application/json
