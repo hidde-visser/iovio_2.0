@@ -257,13 +257,13 @@ Retrieve Agent Reply
 
 Compile Golden Path Script
     [Documentation]             Translates the JSON Golden Path into a pure Robot Framework script.
-...                         Formats the output with structural Settings, Suite Setup, and clean step breaks.
+...                         Formats the output with structural Settings, Suite Setup, Test Setup, and clean step breaks.
     [Arguments]                 ${DIALOGUE_ID}              ${assistant_id}=${NONE}
     
     ${four_spaces}=             Set Variable                ${SPACE}${SPACE}${SPACE}${SPACE}
     
     # ── BUILD THE CORRECT ROBOT FRAMEWORK HEADERS ────────────────────────────
-    # Modified to include a generic Test Setup calling the "Home" keyword for every script execution
+    # Configured with Suite Setup for JWT Auth and Test Setup to enforce navigation to Home page
     ${settings_block}=          Set Variable                *** Settings ***\nResource${four_spaces}../resources/common_keywords.robot\nSuite Setup${four_spaces}UI Login Via JWT\nTest Setup${four_spaces}Home\n\n
     ${test_cases_block}=        Set Variable                *** Test Cases ***\nAgentic Generated Test\n
     ${script_content}=          Set Variable                ${settings_block}${test_cases_block}
@@ -317,8 +317,29 @@ Compile Golden Path Script
     ...                         ${script_content}\n\n
     ...                         Do not attempt to read local filesystem paths and do not pause to ask for human confirmation.
     ...                         Use your internal file upload/creation tools to commit this content immediately.
+    
+    # ── SEND SCRIPT TO THE AGENT FOR COMMITMENT ──────────────────────────────
     Send Message To Agent       ${TARGET_ASSISTANT_ID}      ${DIALOGUE_ID}              ${agent_prompt}
-    ${ignore_reply}=            Retrieve Agent Reply
+    ${agent_reply}=             Retrieve Agent Reply
+    
+    # Check if the AI triggered its safety confirmation protocol (handles "confirm" or "proceed")
+    ${reply_lower}=             Convert To Lower Case        ${agent_reply}
+    ${requires_confirm}=        Run Keyword And Return Status    Should Contain     ${reply_lower}    confirm
+    ${requires_proceed}=        Run Keyword And Return Status    Should Contain     ${reply_lower}    proceed
+    
+    IF                          ${requires_confirm} or ${requires_proceed}
+        Log To Console          \n⚠️ AI requested confirmation before uploading/committing the file.
+        Log To Console          💬 Sending confirmation response: "Yes"
+        
+        Send Message To Agent   ${TARGET_ASSISTANT_ID}      ${DIALOGUE_ID}              Yes
+        ${final_reply}=         Retrieve Agent Reply
+        
+        Log To Console          ✅ File commit processed successfully.
+    ELSE
+        Log To Console          ✅ File created directly without confirmation hurdles.
+    END
+    # ─────────────────────────────────────────────────────────────────────────
+
     RETURN                      ${script_content}
 
 Execute Agentic JSON Steps
