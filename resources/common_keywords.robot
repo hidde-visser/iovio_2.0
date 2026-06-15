@@ -241,7 +241,15 @@ Run Agentic Test Scenario
             IF                  ${recovery_steps}
                 Log To Console                              🩹 Executing Silent Recovery Steps...
                 FOR             ${rec_action}               IN                          @{recovery_steps}
-                    ${rec_kw}=                              Get From Dictionary         ${rec_action}               keyword
+                    # ADD DEFAULT HERE
+                    ${rec_kw}=                              Get From Dictionary         ${rec_action}               keyword    default=UNKNOWN_KEYWORD
+                    
+                    # ADD SAFETY CHECK
+                    IF  '${rec_kw}' == 'UNKNOWN_KEYWORD'
+                        Log To Console    ⚠️ Skipping recovery step: AI returned malformed JSON missing 'keyword'.
+                        CONTINUE
+                    END
+
                     ${rec_args}=                            Get From Dictionary         ${rec_action}               args                default=@{EMPTY}
                     ${rec_kwa}=                             Get From Dictionary         ${rec_action}               kwargs              default=&{EMPTY}
                     Log To Console                          \ \ \ \ ${rec_kw}
