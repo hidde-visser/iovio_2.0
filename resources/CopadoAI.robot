@@ -588,6 +588,7 @@ Generate Agentic System Prompt
 
 Resolve Step Failure
     [Documentation]             Recovers from a failed agentic step by opening a FRESH dialogue thread for the AI Surgeon.
+    ...                         Includes an integrated self-correction loop to handle malformed json layouts or root arrays.
     [Arguments]                 ${assistant_id}
     ...                         ${failed_step}
     ...                         ${error_message}
@@ -605,22 +606,20 @@ Resolve Step Failure
     ${DIALOGUE_ID}              Create Dialogue Thread      ${assistant_id}
     Log To Console              ✅ Surgeon dialogue created: ${DIALOGUE_ID}
 
-    # Attach the DOM state if available (This still goes to /documents)
+    # Attach the DOM state if available
     IF  '${dom_json_path}' != '${NONE}'
         Attach Document To Dialogue    ${dom_json_path}    ${DIALOGUE_ID}
     END
 
-    # --- NEW: Convert Screenshot to Base64 Markdown ---
+    # --- Convert Screenshot to Base64 Markdown ---
     ${markdown_image}=          Set Variable                ${EMPTY}
     IF  '${screenshot_path}' != '${NONE}'
         Log To Console          📸 Encoding failure screenshot for AI Vision...
         ${base64_image}=        Evaluate                    __import__('base64').b64encode(open(r'${screenshot_path}', 'rb').read()).decode('utf-8')
-        # We format it exactly how the Copado UI does
         ${markdown_image}=      Set Variable                \n\n![Screenshot](data:image/png;base64,${base64_image})
     END
-    # --------------------------------------------------
 
-    # Build the Surgeon Prompt
+    # Build the Initial Surgeon Prompt
     ${surgeon_prompt}=          Catenate
     ...                         You are an AI Surgeon tasked with fixing a broken test step.
     ...                         Original Goal: ${user_intent}
@@ -632,7 +631,7 @@ Resolve Step Failure
     ...                         Please analyze the attached DOM context AND the visual screenshot below to fix the broken step.
     ...                         RULES:
     ...                         1. You MUST output ONLY valid JSON. Do not output raw Robot Framework script or conversational text.
-    ...                         2. Your response must match this exact schema:
+    ...                         2. Your response must match this exact dictionary schema:
     ...                         {
     ...                           "escalate": false,
     ...                           "escalation_reason": "",
@@ -640,11 +639,36 @@ Resolve Step Failure
     ...                           "corrected_steps": [ { "intent": "Describe the action", "keyword": "...", "args": [], "kwargs": {} } ]
     ...                         }${markdown_image}
     
-    # Send to agent and retrieve the reply
+    # Dispatch initial request
     Send Message To Agent       ${assistant_id}    ${DIALOGUE_ID}    ${surgeon_prompt}
     ${ai_reply}=                Retrieve Agent Reply
     
-    # Restore the original dialogue ID so the main loop can continue later
+    # ── SELF-CORRECTION RETRY LOOP ──────────────────────────────────────────
+    FOR    ${attempt}    IN RANGE    1    10
+        # Safely dry-run parse the text block without tripping structural framework exceptions
+        ${status}    ${parsed}=  Run Keyword And Ignore Error    Extract Agent JSON Reply    ${ai_reply}
+        ${is_dict}=              Evaluate                    isinstance($parsed, dict) if '${status}' == 'PASS' else False
+        
+        IF    ${is_dict}
+            Log To Console      ✅ AI Surgeon payload validated successfully as Dictionary structure on attempt ${attempt}.
+            BREAK
+        END
+        
+        # If execution reaches here, the AI returned an invalid layout (like a raw list or syntax garbage)
+        Log To Console          ⚠️ AI Surgeon returned invalid schema structure (Attempt ${attempt}/3). Issuing error correction...
+        
+        ${correction_prompt}=    Catenate
+        ...                     CRITICAL ERROR: Your previous response violated the structural constraints.\n
+        ...                     The response must be a single root JSON object/dictionary enclosed in curly braces {}.\n
+        ...                     You returned a raw list/array or text format which caused a system type parsing failure.\n
+        ...                     Please re-read the required keys ("escalate", "escalation_reason", "recovery_steps", "corrected_steps") and resubmit your response wrapped strictly inside a single JSON dictionary object.
+        
+        Send Message To Agent   ${assistant_id}    ${DIALOGUE_ID}    ${correction_prompt}
+        ${ai_reply}=            Retrieve Agent Reply
+    END
+    # ─────────────────────────────────────────────────────────────────────────
+    
+    # Restore the original dialogue ID so the main execution thread can resume
     Set Suite Variable          ${DIALOGUE_ID}     ${ORIGINAL_DIALOGUE_ID}
     
     RETURN                      ${ai_reply}
