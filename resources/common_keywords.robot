@@ -217,7 +217,12 @@ Run Agentic Test Scenario
             ${ts}=                                          Get Current Date            result_format=%Y%m%d_%H%M%S
             ${screenshot_name}=                             Set Variable                failure_screenshot_${ts}.png
             ${screenshot_path}=                             Set Variable                ${OUTPUT_DIR}/${screenshot_name}
-            LogScreenshot                                   ${screenshot_name}
+            
+            # Pass the full absolute path so we know exactly where it saves
+            LogScreenshot                                   ${screenshot_path}
+            
+            # Wait 1 second to ensure the file is completely written to disk
+            Sleep                                           1s
             # -------------------------------
 
             ${remaining_steps}=                             Get Slice From List         ${active_steps}             ${failed_index + 1}
