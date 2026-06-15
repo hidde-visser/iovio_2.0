@@ -210,8 +210,16 @@ Run Agentic Test Scenario
             END
             # ─────────────────────────────────────────────────────────────────
 
-            Log To Console      ⚠️ AI Intervention Required. Mode: ${failure_mode}. Capturing DOM...
+            Log To Console      ⚠️ AI Intervention Required. Mode: ${failure_mode}. Capturing DOM and Screenshot...
             ${dom_json_path}=                               Capture Page Elements
+            
+            # --- NEW: Capture Screenshot ---
+            ${ts}=                                          Get Current Date            result_format=%Y%m%d_%H%M%S
+            ${screenshot_name}=                             Set Variable                failure_screenshot_${ts}.png
+            ${screenshot_path}=                             Set Variable                ${OUTPUT_DIR}/${screenshot_name}
+            LogScreenshot                                   ${screenshot_name}
+            # -------------------------------
+
             ${remaining_steps}=                             Get Slice From List         ${active_steps}             ${failed_index + 1}
             ${remaining_json}=                              Evaluate                    json.dumps($remaining_steps)                    json
 
@@ -225,6 +233,7 @@ Run Agentic Test Scenario
             ...                 ${error_msg}
             ...                 ${remaining_steps}
             ...                 ${dom_json_path}
+            ...                 ${screenshot_path}          # <--- THIS IS THE MISSING PIECE!
             ...                 ${executed_history_json}
             ...                 ${user_intent}
             ...                 ${failure_mode}
@@ -268,4 +277,3 @@ Run Agentic Test Scenario
     FINALLY
         Compile Golden Path Script                          ${DIALOGUE_ID}
     END
-
