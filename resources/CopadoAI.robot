@@ -344,7 +344,8 @@ Retrieve Agent Reply
 Compile Golden Path Script
     [Documentation]             Translates the JSON Golden Path into a pure Robot Framework script.
     [Arguments]                 ${DIALOGUE_ID}
-    ${script_content}=          Set Variable                *** Test Cases ***\nAgentic Generated Test\n
+    # Injects the login keyword explicitly at the top of the compiled test
+    ${script_content}=          Set Variable                *** Test Cases ***\nAgentic Generated Test\n\ \ \ \ UI Login Via JWT\n
 
     FOR                         ${action}                   IN                          @{GOLDEN_PATH_SCRIPT}
         ${keyword}=             Get From Dictionary         ${action}                   keyword    default=# MISSING_KEYWORD
@@ -407,6 +408,14 @@ Execute Agentic JSON Steps
 
             FOR                 ${action}                   IN                          @{strategy_actions}
                 ${keyword}=     Get From Dictionary         ${action}                   keyword                     default=UNKNOWN_KEYWORD
+                
+                # --- NEW SAFETY FILTER ---
+                IF              '${keyword}' == 'UI Login Via JWT' or '${keyword}' == 'Login'
+                    Log To Console      ⏩ Skipping '${keyword}' during agentic execution (already logged in).
+                    CONTINUE
+                END
+                # -------------------------
+
                 ${args}=        Get From Dictionary         ${action}                   args                        default=@{EMPTY}
                 ${raw_kwargs}=                              Get From Dictionary         ${action}                   kwargs                     default=&{EMPTY}
 
@@ -549,6 +558,7 @@ Generate Agentic System Prompt
     ...                         3. THE 1-TO-1 ACTION RULE: Every object in the root array represents exactly ONE discrete browser interaction. Do not combine sequential steps.
     ...                         4. LINEAR CONTRACT: Because you cannot see the live DOM yet, provide exactly ONE execution track inside the "strategies" array. Do not attempt to guess or invent backup paths.
     ...                         5. Ambiguous clicks (like "Save") MUST include "partial_match\=False" in kwargs.
+    ...                         6. ASSUME PRE-AUTHENTICATED: The browser is already open and logged into Salesforce. Do NOT include any login steps or keywords (like UI Login Via JWT). Start immediately with the test intent.
     ...                         INITIAL SCHEMA FORMAT:
     ...                         [
     ...                         {
