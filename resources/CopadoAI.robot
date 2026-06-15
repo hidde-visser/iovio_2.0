@@ -390,9 +390,10 @@ Execute Agentic JSON Steps
     ...                         save                        next                        done                        submit                     confirm            create    finish
 
     FOR                         ${index}                    ${step}                     IN ENUMERATE                @{json_steps}
-        ${step_intent}=         Get From Dictionary         ${step}                     intent
-        ${strategies}=          Get From Dictionary         ${step}                     strategies
-        ${is_risky}=            Get From Dictionary         ${step}                     is_risky                    default=${False}
+        # ADD DEFAULTS HERE
+        ${step_intent}=         Get From Dictionary         ${step}                     intent        default=UNKNOWN_STEP_INTENT
+        ${strategies}=          Get From Dictionary         ${step}                     strategies    default=@{EMPTY}
+        ${is_risky}=            Get From Dictionary         ${step}                     is_risky      default=${False}
 
         Log To Console          \n🤖 Attempting Intent: ${step_intent}
 
