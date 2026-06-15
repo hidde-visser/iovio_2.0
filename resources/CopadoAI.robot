@@ -610,10 +610,6 @@ Resolve Step Failure
         Attach Document To Dialogue    ${dom_json_path}    ${DIALOGUE_ID}
     END
 
-    # --- NEW: Attach the Screenshot if available ---
-    IF  '${screenshot_path}' != '${NONE}'
-        Attach Document To Dialogue    ${screenshot_path}    ${DIALOGUE_ID}
-    END
     # -----------------------------------------------
 
     # Build the Surgeon Prompt
