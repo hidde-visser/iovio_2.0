@@ -148,10 +148,25 @@ Capture Page Elements
     RETURN                      ${target_path}
 Run Agentic Test Scenario
     [Documentation]             Top-level orchestrator for the agentic test execution loop.
-    ...                         Unified with Fix 1 (Type Guard) and Fix 2 (Index Circuit Breaker).
+    ...                         Unified with:
+    ...                         - Fix 1 (Type Guard Intercept)
+    ...                         - Fix 2 (Index-based Circuit Breaker)
+    ...                         - Fix 4 (Data Isolation Suite Reset)
     [Arguments]                 ${assistant_id}             ${user_intent}              ${metadata_json_path}=${NONE}
 
     Log To Console              🚀 Starting Agentic Scenario for Intent: ${user_intent}
+
+    # ── FIX 4: DATA ISOLATION SUITE RESET ────────────────────────────────────
+    # Reset tracking arrays so previous scenarios do not bleed into this execution thread
+    @{ALL_PROPOSED_STEPS}=          Create List
+    Set Suite Variable              @{ALL_PROPOSED_STEPS}
+    @{EXECUTION_HISTORY_PASSED}=    Create List
+    Set Suite Variable              @{EXECUTION_HISTORY_PASSED}
+    @{EXECUTION_HISTORY_FAILED}=    Create List
+    Set Suite Variable              @{EXECUTION_HISTORY_FAILED}
+    @{GOLDEN_PATH_SCRIPT}=          Create List
+    Set Suite Variable              @{GOLDEN_PATH_SCRIPT}
+    # ─────────────────────────────────────────────────────────────────────────
 
     # Only attach the metadata file if a path was actually provided and exists.
     IF                          $metadata_json_path != $NONE and $metadata_json_path != '${EMPTY}'
@@ -191,7 +206,6 @@ Run Agentic Test Scenario
             END
 
             # ── FIX 2: INDEX-BASED CIRCUIT BREAKER RETRY EVALUATION ──────────
-            # Instead of tracking volatile text descriptions, evaluate the specific step array index.
             IF                  $failed_index == $last_failed_index
                 ${step_retries}=                            Evaluate                    ${step_retries} + 1
             ELSE
@@ -239,7 +253,6 @@ Run Agentic Test Scenario
             ${surgeon_payload}=                             Extract Agent JSON Reply    ${ai_reply}
 
             # ── FIX 1: NON-DICTIONARY TYPE GUARD ─────────────────────────────
-            # Safely intercept malformed non-dictionary structures before they hit Mapping conversion actions
             ${is_dict}=                                     Evaluate                    isinstance($surgeon_payload, dict)
             IF                  not ${is_dict}
                 Log To Console                              🛑 CRITICAL: AI Surgeon returned a non-dictionary payload type.
