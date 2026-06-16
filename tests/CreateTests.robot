@@ -13,6 +13,7 @@ Suite Setup                     Initialize Salesforce Session
 *** Variables ***
 @{objects}                      Lead
 ${target_assistant_name}        Orchestrate Agent
+${number_of_scenarios}          3
 
 *** Test Cases ***
 Conversational AI Health Check
@@ -20,7 +21,7 @@ Conversational AI Health Check
 
     # # 1. Fetch the Org Data (The script does this, not the AI)
     ${timestamp}=               Get Time                    format=%Y-%m-%dT%H%M%S
-    ${config}=                  Build Org Contract Config                              ${objects}[0]
+    ${config}=                  Build Org Contract Config                               ${objects}[0]
     ${raw_result}=              Execute Dynamic Operations                              ${config}
     ${obj_dict}=                Create Dictionary           Lead=${raw_result}
     ${clean_result}=            Sanitize Org Contract       ${obj_dict}
@@ -42,7 +43,7 @@ Conversational AI Health Check
     ${prompt}=                  Catenate
     ...                         You are a Salesforce QA Architect. I have attached the metadata for my Salesforce org.\n
     ...                         Please perform a Health Check analysis on this metadata.\n
-    ...                         Identify the 1 most critical test scenarios we should execute based on validation rules, required fields, and layouts.\n
+    ...                         Identify the ${number_of_scenarios} most critical test scenarios we should execute based on validation rules, required fields, and layouts.\n
     ...                         I understand that you must provide context and act as a knowledgeable mentor. Therefore, please explain your reasoning fully, but format your ENTIRE response as a structured JSON array.\n
     ...                         Place your detailed mentor explanation inside the "explanation" key for each scenario.\n
     ...                         You must use this exact JSON schema:\n
@@ -58,28 +59,28 @@ Conversational AI Health Check
     TRY
         Log To Console          ⏳ Giving the AI 60 seconds to index the metadata document...
         Sleep                   60s
-        
+
         # FIX: Pass Dialogue ID as the first positional argument
-        Wait Until Dialogue Is Idle             ${DIALOGUE_ID}              max_attempts=12             poll_interval=5s
+        Wait Until Dialogue Is Idle                         ${DIALOGUE_ID}              max_attempts=12        poll_interval=5s
 
         Log To Console          💬 Sending prompt to agent...
-        Send Message To Agent              ${TARGET_ASSISTANT_ID}      ${DIALOGUE_ID}      ${prompt}            max_retries=50
+        Send Message To Agent                               ${TARGET_ASSISTANT_ID}      ${DIALOGUE_ID}         ${prompt}                 max_retries=50
         ${ai_reply}=            Retrieve Agent Reply
 
     EXCEPT
         Log To Console          ⚠️ Agent thread seems locked/bricked. Initiating a new chat...
 
         ${DIALOGUE_ID}          Create Dialogue Thread      ${TARGET_ASSISTANT_ID}
-        Attach Document To Dialogue         ${meta_file}                ${DIALOGUE_ID}
-        Verify Document Is Ready            org_context_${timestamp}.json               ${DIALOGUE_ID}
+        Attach Document To Dialogue                         ${meta_file}                ${DIALOGUE_ID}
+        Verify Document Is Ready                            org_context_${timestamp}.json                      ${DIALOGUE_ID}
 
         Log To Console          ⏳ Giving the new thread 60 seconds to index the metadata document...
         Sleep                   60s
-        
-        # FIX: Pass Dialogue ID as the first positional argument here too
-        Wait Until Dialogue Is Idle             ${DIALOGUE_ID}              max_attempts=12             poll_interval=5s
 
-        Send Message To Agent              ${TARGET_ASSISTANT_ID}      ${DIALOGUE_ID}      ${prompt}             max_retries=50
+        # FIX: Pass Dialogue ID as the first positional argument here too
+        Wait Until Dialogue Is Idle                         ${DIALOGUE_ID}              max_attempts=12        poll_interval=5s
+
+        Send Message To Agent                               ${TARGET_ASSISTANT_ID}      ${DIALOGUE_ID}         ${prompt}                 max_retries=50
         ${ai_reply}=            Retrieve Agent Reply
     END
 
@@ -92,10 +93,10 @@ Conversational AI Health Check
 
     # 7. Feed the AI's suggestions directly into your execution engine
     FOR                         ${scenario}                 IN                          @{test_scenarios}
-        ${target_intent}=       Get From Dictionary         ${scenario}                 intent    default=UNKNOWN_INTENT
+        ${target_intent}=       Get From Dictionary         ${scenario}                 intent                 default=UNKNOWN_INTENT
 
-        IF  $target_intent == 'UNKNOWN_INTENT'
-            Log To Console          ⚠️ Skipping scenario: AI generated an object without an 'intent' key.
+        IF                      $target_intent == 'UNKNOWN_INTENT'
+            Log To Console      ⚠️ Skipping scenario: AI generated an object without an 'intent' key.
             CONTINUE
         END
 
