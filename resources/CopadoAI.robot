@@ -537,23 +537,29 @@ Resolve Step Failure
     END
 
     ${surgeon_prompt}=          Catenate
-    ...                         You are an AI Surgeon tasked with fixing a broken test step.
-    ...                         Original Goal: ${user_intent}
-    ...                         Failed Step: ${failed_step}
-    ...                         Error Encountered: ${error_message}
-    ...                         Failure Mode: ${failure_mode}
-    ...                         Execution History: ${executed_history_json}
-    ...                         Remaining Steps: ${remaining_steps}
-    ...                         Please analyze the attached DOM context AND the visual screenshot below to fix the broken step.
-    ...                         RULES:
-    ...                         1. You MUST output ONLY valid JSON. Do not output raw Robot Framework script or conversational text.
-    ...                         2. Your response must match this exact schema:
+    ...                         You are an expert QA Automation AI Surgeon specializing in Salesforce testing using Robot Framework and QWeb.
+    ...                         Your sole objective is to analyze a failed test step, evaluate the error, and provide a precise correction so the test execution can heal and continue.
+    ...                         
+    ...                         --- FAILURE CONTEXT ---
+    ...                         • Failed Step: ${failed_step}
+    ...                         • Error Encountered: ${error_message}
+    ...                         • Prior Execution History: ${executed_history_json}
+    ...                         
+    ...                         --- CRITICAL HEALING RULES FOR PICKLISTS ---
+    ...                         1. If the failure involves selecting a picklist value (e.g., 'Web' is not found, or an invalid option error occurs), you MUST consult the attached 'org_context_*.json' metadata file.
+    ...                         2. Treat this JSON file as your absolute source of truth. Locate the specific object (e.g., Lead) and field (e.g., Product of Interest) to view the actual allowed picklistValues array.
+    ...                         3. Do NOT guess another option, and do NOT skip the step. Identify a valid option from the metadata list and update the step arguments to use it.
+    ...                         4. If the script becomes incomplete because of a bad choice, choose a safe default valid option from the metadata to ensure the test case achieves coverage.
+    ...                         
+    ...                         --- SYSTEM CONSTRAINTS & OUTPUT FORMAT ---
+    ...                         • You must respond ONLY with a single, valid JSON object.
+    ...                         • Do NOT wrap your response in markdown code blocks like \`\`\`json ... \`\`\`.
+    ...                         • Ensure the JSON strictly follows this dictionary structure so the parser does not fail:
     ...                         {
-    ...                           "escalate": false,
-    ...                           "escalation_reason": "",
-    ...                           "recovery_steps": [ { "intent": "Describe the action", "keyword": "...", "args": [], "kwargs": {} } ],
-    ...                           "corrected_steps": [ { "intent": "Describe the action", "keyword": "...", "args": [], "kwargs": {} } ]
-    ...                         }${markdown_image}
+    ...                             "intent": "Select a valid alternative picklist value derived from metadata context",
+    ...                             "keyword": "DropDown",
+    ...                             "arguments": ["Product of Interest", "ValidValueFromJSON"]
+    ...                         }
     
     Send Message To Agent       ${assistant_id}             ${DIALOGUE_ID}              ${surgeon_prompt}
     ${ai_reply}=                Retrieve Agent Reply
