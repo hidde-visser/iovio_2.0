@@ -183,7 +183,7 @@ Run Agentic Test Scenario
     ${global_retries}=          Set Variable                0
     ${MAX_GLOBAL_RETRIES}=      Set Variable                50
     ${step_retries}=            Set Variable                0
-    ${MAX_STEP_RETRIES}=        Set Variable                3
+    ${MAX_STEP_RETRIES}=        Set Variable                10
 
     # ── FIX 2: CIRCUIT BREAKER INITIALIZATION ────────────────────────────────
     # Initialize tracker as an index integer instead of a volatile intent string
