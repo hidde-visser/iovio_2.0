@@ -94,7 +94,7 @@ Conversational AI Health Check
     FOR                         ${scenario}                 IN                          @{test_scenarios}
         ${target_intent}=       Get From Dictionary         ${scenario}                 intent    default=UNKNOWN_INTENT
 
-        IF  '${target_intent}' == 'UNKNOWN_INTENT'
+        IF  $target_intent == 'UNKNOWN_INTENT'
             Log To Console          ⚠️ Skipping scenario: AI generated an object without an 'intent' key.
             CONTINUE
         END
