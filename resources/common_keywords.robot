@@ -147,12 +147,14 @@ Capture Page Elements
     Create File                 ${target_path}              ${json_output}
 
     RETURN                      ${target_path}
+
 Run Agentic Test Scenario
     [Documentation]             Top-level orchestrator for the agentic test execution loop.
     ...                         Unified with:
     ...                         - Fix 1 (Type Guard Intercept)
     ...                         - Fix 2 (Index-based Circuit Breaker)
     ...                         - Fix 4 (Data Isolation Suite Reset)
+    ...                         - V0.12: Dynamic Test Naming & Screenshot Integration
     [Arguments]                 ${assistant_id}             ${user_intent}              ${metadata_json_path}=${NONE}
 
     Log To Console              🚀 Starting Agentic Scenario for Intent: ${user_intent}
@@ -173,12 +175,17 @@ Run Agentic Test Scenario
     IF                          $metadata_json_path != $NONE and $metadata_json_path != '${EMPTY}'
         Log To Console          📦 Attaching Salesforce Org Metadata Contract...
         Wait Until Keyword Succeeds                         10x
-        ...                     2s                          Attach Document To Dialogue                             ${DIALOGUE_ID}             ${metadata_json_path}
+        ...                     2s                          Attach Document To Dialogue                             ${DIALOGUE_ID}              ${metadata_json_path}
     END
 
     ${ai_reply}=                Generate Initial Test Steps
     ...                         ${assistant_id}             ${user_intent}
     ${active_steps}=            Extract Agent JSON Reply    ${ai_reply}
+
+    # ── V0.12: DYNAMIC TEST NAMING ───────────────────────────────────────────
+    ${test_name}=               Generate Agentic Test Name  ${assistant_id}             ${DIALOGUE_ID}              ${user_intent}
+    Log To Console              🏷️ Test named as: ${test_name}
+    # ─────────────────────────────────────────────────────────────────────────
 
     ${global_retries}=          Set Variable                0
     ${MAX_GLOBAL_RETRIES}=      Set Variable                50
@@ -222,7 +229,7 @@ Run Agentic Test Scenario
                 # Pure Robot Framework replacement to verify negative testing intent
                 ${user_intent_lower}=                       Convert To Lower Case       ${user_intent}
                 ${is_negative_test}=                        Set Variable                ${False}
-                @{boundary_words}=                          Create List                 exceed                      limit                      error                 validation             invalid    boundary
+                @{boundary_words}=                          Create List                 exceed                      limit                      error                 validation             invalid             boundary
 
                 FOR             ${word}                     IN                          @{boundary_words}
                     ${contains}=                            Run Keyword And Return Status                           Should Contain             ${user_intent_lower}             ${word}
@@ -245,7 +252,8 @@ Run Agentic Test Scenario
 
             # --- Capture Screenshot ---
             ${ts}=              Get Current Date            result_format=%Y%m%d_%H%M%S
-            ${screenshot_name}=                             Set Variable                failure_screenshot_${ts}.png
+            # ── V0.12: INJECT TEST NAME INTO SCREENSHOT ────────────────────────
+            ${screenshot_name}=                             Set Variable                ${test_name}_failure_${ts}.png
             ${screenshot_path}=                             Set Variable                ${OUTPUT_DIR}/${screenshot_name}
 
             LogScreenshot       ${screenshot_path}
@@ -314,6 +322,6 @@ Run Agentic Test Scenario
         END
 
     FINALLY
-    # Pass the active assistant_id to ensure the compiler doesn't hit a 502 workspace error
-        Compile Golden Path Script                          ${DIALOGUE_ID}              ${assistant_id}
+    # Pass the active assistant_id and the dynamically generated test name to the compiler
+        Compile Golden Path Script                          ${DIALOGUE_ID}              ${assistant_id}             ${test_name}
     END
