@@ -1,6 +1,8 @@
 *** Settings ***
 Library                         RequestsLibrary
 Library                         QForce
+Library                         CopadoAI
+Library                         img2pdf
 Library                         XML
 Resource                        ../resources/CopadoAI.robot
 Library                         ../resources/ObjectSanitizer.py
@@ -16,6 +18,21 @@ ${target_assistant_name}        Orchestrate Agent
 ${number_of_scenarios}          3
 
 *** Test Cases ***
+Test
+    ${ts}=                      Get Current Date            result_format=%Y%m%d_%H%M%S
+    ${screenshot_name}=         Set Variable                ${test_name}_failure_${ts}.png
+    ${screenshot_path}=         Set Variable                ${OUTPUT_DIR}/${screenshot_name}
+
+    # QWeb's LogScreenshot forces its own naming convention (screenshot-<test>-<uuid>.png).
+    # We capture its returned path and copy it to our custom test-named path.
+    ${qweb_screenshot}=         LogScreenshot
+    Copy File                   ${qweb_screenshot}          ${screenshot_path}
+
+    ${response}                 Prompt                      Can you read this screenshot ${screenshot_path}
+    Log To Console              ${response}
+
+    img2pdf img1.png img2.jpg -o out.pdf
+
 Conversational AI Health Check
     [Documentation]             Feeds org data to the AI, asks for advice, and executes the results.
 
