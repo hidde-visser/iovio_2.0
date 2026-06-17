@@ -258,14 +258,17 @@ Retrieve Agent Reply
 Compile Golden Path Script
     [Documentation]             Translates the JSON Golden Path into a pure Robot Framework script.
     ...                         Formats the output with structural Settings, Suite Setup, Test Setup, and clean step breaks.
-    [Arguments]                 ${DIALOGUE_ID}              ${assistant_id}=${NONE}
+    [Arguments]                 ${DIALOGUE_ID}              ${assistant_id}=${NONE}     ${test_name}=Agentic_Generated_Test
     
     ${four_spaces}=             Set Variable                ${SPACE}${SPACE}${SPACE}${SPACE}
     
     # ── BUILD THE CORRECT ROBOT FRAMEWORK HEADERS ────────────────────────────
     # Configured with Suite Setup for JWT Auth and Test Setup to enforce navigation to Home page
     ${settings_block}=          Set Variable                *** Settings ***\nResource${four_spaces}../resources/common_keywords.robot\nSuite Setup${four_spaces}UI Login Via JWT\nTest Setup${four_spaces}Home\n\n
-    ${test_cases_block}=        Set Variable                *** Test Cases ***\nAgentic Generated Test\n
+    
+    # Convert snake_case back to readable words for the Robot file
+    ${readable_test_name}=      Evaluate                    str('${test_name}').replace('_', ' ')
+    ${test_cases_block}=        Set Variable                *** Test Cases ***\n${readable_test_name}\n
     ${script_content}=          Set Variable                ${settings_block}${test_cases_block}
     # ─────────────────────────────────────────────────────────────────────────
 
@@ -299,8 +302,9 @@ Compile Golden Path Script
     Log To Console              🌟 COMPILED GOLDEN PATH SCRIPT 🌟
     Log To Console              Script: \n${script_content}
 
+    # Inject the test name into the saved file name
     ${ts}=                      Get Time                    format=%Y%m%d_%H%M%S
-    ${file_name}=               Set Variable                Agentic_Golden_Path_${ts}.robot
+    ${file_name}=               Set Variable                ${test_name}_${ts}.robot
     ${file_path}=               Set Variable                ${OUTPUT_DIR}/${file_name}
     Create File                 ${file_path}                ${script_content}
     Log To Console              💾 Backup saved to: ${file_path}
