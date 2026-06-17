@@ -33,7 +33,7 @@ Test
 
     ${pdf_file}                 Set Variable                ${OUTPUT_DIR}/${test_name}_failure_${ts}.pdf
 
-    Convert Png To Pdf          ${screenshot_path}          ${pdf_file}
+    Convert Png To Pdf          ${screenshot_path}          ${pdf_file}  
 
 Conversational AI Health Check
     [Documentation]             Feeds org data to the AI, asks for advice, and executes the results.
