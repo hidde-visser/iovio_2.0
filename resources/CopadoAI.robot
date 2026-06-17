@@ -29,7 +29,7 @@ ${TEST_JOB_ID}                  188251
 *** Keywords *** 
 Initialize Copado AI Session
     [Documentation]             Strips variables and creates a persistent network session pool.
-    Evaluate                    urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)    modules=urllib3
+    Evaluate                    urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)                 modules=urllib3
     ${CLEAN_API_KEY}=           String.Strip String         ${project_api_key}
     ${CLEAN_ORG}=               String.Strip String         ${project_org_id}
     ${CLEAN_WSPACE}=            String.Strip String         ${project_workspace}
@@ -47,7 +47,7 @@ Initialize Copado AI Session
 
 Send Message To Agent
     [Documentation]             Posts a prompt message to the specified assistant dialogue thread with exponential backoff for 403 warming periods.
-    [Arguments]                 ${target_assistant_id}      ${DIALOGUE_ID}              ${prompt}    ${max_retries}=50    ${backoff_base}=10
+    [Arguments]                 ${target_assistant_id}      ${DIALOGUE_ID}              ${prompt}                   ${max_retries}=50           ${backoff_base}=10
     ${msg_uuid}=                Evaluate                    str(uuid.uuid4())           modules=uuid
     Log To Console              Sending message with request ID: ${msg_uuid}
 
@@ -59,7 +59,7 @@ Send Message To Agent
     FOR                         ${attempt}                  IN RANGE                    1                           ${max_retries} + 1
         Log To Console          📤 [Attempt ${attempt}/${max_retries}] POSTing message to dialogue ${DIALOGUE_ID}...
         ${url}                  Set Variable                /organizations/${CLEAN_ORG}/dialogues/${DIALOGUE_ID}/messages
-        ${response}=            POST On Session             alias=CopadoSession         url=${url}                  json=${message_payload}    expected_status=any    timeout=90
+        ${response}=            POST On Session             alias=CopadoSession         url=${url}                  json=${message_payload}     expected_status=any    timeout=90
         ${http_status}=         Set Variable                ${response.status_code}
         Log To Console          ↳ HTTP ${http_status} received.
 
@@ -86,7 +86,7 @@ Generate Initial Test Steps
     [Documentation]             Combines the system rules and user intent, sends it to the AI, and retrieves the structured JSON step sequence.
     [Arguments]                 ${assistant_id}             ${user_intent}
     ${system_prompt}=           Generate Agentic System Prompt
-    ${full_prompt}=             Catenate                    SEPARATOR=\n\n             ${system_prompt}            USER INTENT: ${user_intent}
+    ${full_prompt}=             Catenate                    SEPARATOR=\n\n              ${system_prompt}            USER INTENT: ${user_intent}
     Log To Console              🧠 Generating initial test steps for intent: ${user_intent}
     Send Message To Agent       ${assistant_id}             ${DIALOGUE_ID}              ${full_prompt}
     ${ai_reply}=                Retrieve Agent Reply
@@ -118,7 +118,7 @@ Get Agent ID By Name
     ${WSPACE}=                  String.Strip String         ${workspace_id}
     Log To Console              Discovering assistants in workspace: ${WSPACE}
     ${url_workspace}=           Set Variable                /organizations/${CLEAN_ORG}/workspaces/${WSPACE}
-    ${workspace_detail_res}=    GET On Session              alias=CopadoSession         url=${url_workspace}        expected_status=200    timeout=90
+    ${workspace_detail_res}=    GET On Session              alias=CopadoSession         url=${url_workspace}        expected_status=200         timeout=90
     ${workspace_data}=          Set Variable                ${workspace_detail_res.json()}
     ${assistants_list}=         Set Variable                ${workspace_data['assistants']}
     ${TARGET_ASSISTANT_ID}=     Set Variable                knowledge
@@ -167,7 +167,7 @@ Wait Until Dialogue Is Idle
     ${url}=                     Set Variable                /organizations/${CLEAN_ORG}/dialogues/${DIALOGUE_ID}
 
     FOR                         ${attempt}                  IN RANGE                    1                           ${max_attempts} + 1
-        ${dial_res}=            GET On Session              alias=CopadoSession         url=${url}                  expected_status=any    timeout=30
+        ${dial_res}=            GET On Session              alias=CopadoSession         url=${url}                  expected_status=any         timeout=30
         ${dial_data}=           Set Variable                ${dial_res.json()}
         ${status}=              Get From Dictionary         ${dial_data}                status                      default=unknown
         ${is_processing}=       Get From Dictionary         ${dial_data}                is_processing               default=${False}
@@ -195,28 +195,28 @@ Attach Document To Dialogue
     [Arguments]                 ${file_path}                ${DIALOGUE_ID}
     ${absolute_path}=           Normalize Path              ${file_path}
     Should Exist                ${absolute_path}
-    
+
     ${file_name}=               Fetch From Right            ${absolute_path}            /
     ${file_handle}=             Evaluate                    open($absolute_path, 'rb')
-    
+
     ${ext}=                     Evaluate                    '${file_name}'.split('.')[-1].lower()
-    ${mime_type}=               Evaluate                    'image/png' if '${ext}' in ['png', 'jpg', 'jpeg'] else 'application/json'
+    ${mime_type}=               Evaluate                    'application/pdf' if '${ext}' == 'pdf' else ('image/png' if '${ext}' in ['png', 'jpg', 'jpeg'] else 'application/json')
     ${file_tuple}=              Create List                 ${file_name}                ${file_handle}              ${mime_type}
-    
+
     ${file_obj}=                Create Dictionary           file=${file_tuple}
     ${upload_headers}=          Create Dictionary           accept=application/json
-    ${dialogue_document_url}=   Set Variable                /organizations/${CLEAN_ORG}/dialogues/${DIALOGUE_ID}/documents
+    ${dialogue_document_url}=                               Set Variable                /organizations/${CLEAN_ORG}/dialogues/${DIALOGUE_ID}/documents
 
-    ${upload_res}=              POST On Session             alias=CopadoSession         url=${dialogue_document_url}    headers=${upload_headers}    files=${file_obj}    expected_status=201    timeout=90
+    ${upload_res}=              POST On Session             alias=CopadoSession         url=${dialogue_document_url}                            headers=${upload_headers}                     files=${file_obj}           expected_status=201                           timeout=90
     Log To Console              Document successfully attached: ${file_name}
     RETURN                      ${file_name}
 
 Verify Document Is Ready
     [Arguments]                 ${file_name}                ${DIALOGUE_ID}
     ${url}=                     Set Variable                /organizations/${CLEAN_ORG}/dialogues/${DIALOGUE_ID}
-    ${dialogue_res}=            GET On Session              alias=CopadoSession         url=${url}                  expected_status=any    timeout=90
+    ${dialogue_res}=            GET On Session              alias=CopadoSession         url=${url}                  expected_status=any         timeout=90
     ${agent_session_url}=       Set Variable                /organizations/${CLEAN_ORG}/dialogues/${DIALOGUE_ID}/agent-session
-    ${session_res}=             GET On Session              alias=CopadoSession         url=${agent_session_url}    expected_status=any    timeout=90
+    ${session_res}=             GET On Session              alias=CopadoSession         url=${agent_session_url}    expected_status=any         timeout=90
 
     Log To Console              \n--- [DIAGNOSTIC: DIALOGUE THREAD STATE] ---
     Log To Console              Dialogue HTTP Status: ${dialogue_res.status_code}
@@ -233,7 +233,7 @@ Retrieve Agent Reply
     ${dialogue_url}=            Set Variable                /organizations/${CLEAN_ORG}/dialogues/${DIALOGUE_ID}
 
     FOR                         ${poll_idx}                 IN RANGE                    1                           ${max_polls} + 1
-        ${history_res}=         GET On Session              alias=CopadoSession         url=${dialogue_url}         expected_status=200    timeout=90
+        ${history_res}=         GET On Session              alias=CopadoSession         url=${dialogue_url}         expected_status=200         timeout=90
         ${history_json}=        Set Variable                ${history_res.json()}
         ${all_messages}=        Get From Dictionary         ${history_json}             messages                    default=@{EMPTY}
         ${msg_count}=           Get Length                  ${all_messages}
@@ -241,11 +241,11 @@ Retrieve Agent Reply
         IF                      ${msg_count} > 0
             ${last_message}=    Get From List               ${all_messages}             -1
             ${role}=            Get From Dictionary         ${last_message}             role                        default=${EMPTY}
-            
+
             IF                  '${role}' == 'ai' or '${role}' == 'assistant'
                 ${ai_final_reply}=                          Get From Dictionary         ${last_message}             content
                 Log To Console                              ✅ Compiled AI Agent Answer Received.
-                RETURN                                      ${ai_final_reply}
+                RETURN          ${ai_final_reply}
             END
         END
 
@@ -259,13 +259,13 @@ Compile Golden Path Script
     [Documentation]             Translates the JSON Golden Path into a pure Robot Framework script.
     ...                         Formats the output with structural Settings, Suite Setup, Test Setup, and clean step breaks.
     [Arguments]                 ${DIALOGUE_ID}              ${assistant_id}=${NONE}     ${test_name}=Agentic_Generated_Test
-    
+
     ${four_spaces}=             Set Variable                ${SPACE}${SPACE}${SPACE}${SPACE}
-    
+
     # ── BUILD THE CORRECT ROBOT FRAMEWORK HEADERS ────────────────────────────
     # Configured with Suite Setup for JWT Auth and Test Setup to enforce navigation to Home page
     ${settings_block}=          Set Variable                *** Settings ***\nResource${four_spaces}../resources/common_keywords.robot\nSuite Setup${four_spaces}UI Login Via JWT\nTest Setup${four_spaces}Home\n\n
-    
+
     # Convert snake_case back to readable words for the Robot file
     ${readable_test_name}=      Evaluate                    str('${test_name}').replace('_', ' ')
     ${test_cases_block}=        Set Variable                *** Test Cases ***\n${readable_test_name}\n
@@ -310,34 +310,34 @@ Compile Golden Path Script
     Log To Console              💾 Backup saved to: ${file_path}
 
     IF                          '${assistant_id}' != '${NONE}' and '${assistant_id}' != '${EMPTY}'
-        ${TARGET_ASSISTANT_ID}=  Set Variable               ${assistant_id}
+        ${TARGET_ASSISTANT_ID}=                             Set Variable                ${assistant_id}
     ELSE
-        ${TARGET_ASSISTANT_ID}=  Get Agent ID By Name        Orchestrate Agent           ${CLEAN_WSPACE}
+        ${TARGET_ASSISTANT_ID}=                             Get Agent ID By Name        Orchestrate Agent           ${CLEAN_WSPACE}
     END
-    
+
     ${agent_prompt}=            Catenate
     ...                         Please create a new file named "${file_name}" inside the "tests/" folder of the Test Job "${TEST_JOB_NAME}" (ID: ${TEST_JOB_ID}) within Project "${PROJECT_NAME}" (ID: ${PROJECT_ID}).\n\n
     ...                         Here is the exact file content you must write:\n
     ...                         ${script_content}\n\n
     ...                         Do not attempt to read local filesystem paths and do not pause to ask for human confirmation.
     ...                         Use your internal file upload/creation tools to commit this content immediately.
-    
+
     # ── SEND SCRIPT TO THE AGENT FOR COMMITMENT ──────────────────────────────
     Send Message To Agent       ${TARGET_ASSISTANT_ID}      ${DIALOGUE_ID}              ${agent_prompt}
     ${agent_reply}=             Retrieve Agent Reply
-    
+
     # Check if the AI triggered its safety confirmation protocol (handles "confirm" or "proceed")
-    ${reply_lower}=             Convert To Lower Case        ${agent_reply}
-    ${requires_confirm}=        Run Keyword And Return Status    Should Contain     ${reply_lower}    confirm
-    ${requires_proceed}=        Run Keyword And Return Status    Should Contain     ${reply_lower}    proceed
-    
+    ${reply_lower}=             Convert To Lower Case       ${agent_reply}
+    ${requires_confirm}=        Run Keyword And Return Status                           Should Contain              ${reply_lower}              confirm
+    ${requires_proceed}=        Run Keyword And Return Status                           Should Contain              ${reply_lower}              proceed
+
     IF                          ${requires_confirm} or ${requires_proceed}
         Log To Console          \n⚠️ AI requested confirmation before uploading/committing the file.
         Log To Console          💬 Sending confirmation response: "Yes"
-        
-        Send Message To Agent   ${TARGET_ASSISTANT_ID}      ${DIALOGUE_ID}              Yes
+
+        Send Message To Agent                               ${TARGET_ASSISTANT_ID}      ${DIALOGUE_ID}              Yes
         ${final_reply}=         Retrieve Agent Reply
-        
+
         Log To Console          ✅ File commit processed successfully.
     ELSE
         Log To Console          ✅ File created directly without confirmation hurdles.
@@ -349,21 +349,21 @@ Compile Golden Path Script
 Generate Agentic Test Name
     [Documentation]             Asks the AI to generate a concise, snake_case test case name based on the user intent.
     [Arguments]                 ${assistant_id}             ${DIALOGUE_ID}              ${user_intent}
-    
+
     ${prompt}=                  Catenate
     ...                         Please generate a concise, descriptive Robot Framework test case name for the following test intent.\n
     ...                         Format the name without spaces (use underscores, e.g., Create_New_Lead_Record).\n
     ...                         USER INTENT: ${user_intent}\n\n
     ...                         Return ONLY a valid JSON object matching this schema:\n
     ...                         {\n
-    ...                             "test_name": "Generated_Test_Name"\n
+    ...                         "test_name": "Generated_Test_Name"\n
     ...                         }
-    
+
     Log To Console              🧠 Generating descriptive test name for intent...
     Send Message To Agent       ${assistant_id}             ${DIALOGUE_ID}              ${prompt}
     ${ai_reply}=                Retrieve Agent Reply
     ${parsed_json}=             Extract Agent JSON Reply    ${ai_reply}
-    
+
     ${test_name}=               Get From Dictionary         ${parsed_json}              test_name                   default=Agentic_Generated_Test
     ${test_name}=               Evaluate                    str('${test_name}').replace(' ', '_')
     RETURN                      ${test_name}
@@ -371,7 +371,7 @@ Generate Agentic Test Name
 Execute Agentic JSON Steps
     [Documentation]             Iterates over AI-proposed JSON steps, executes them, and routes failures.
     [Arguments]                 ${json_steps}               ${user_intent}
-    @{DESTRUCTIVE_TRIGGERS}=    Create List                 save                        next                        done                        submit                     confirm            create    finish
+    @{DESTRUCTIVE_TRIGGERS}=    Create List                 save                        next                        done                        submit                 confirm                create                      finish
 
     FOR                         ${index}                    ${step}                     IN ENUMERATE                @{json_steps}
         ${step_intent}=         Get From Dictionary         ${step}                     intent                      default=UNKNOWN_STEP_INTENT
@@ -383,15 +383,15 @@ Execute Agentic JSON Steps
         ${last_error}=          Set Variable                ${EMPTY}
         ${failure_mode}=        Set Variable                HARD_KEYWORD_ERROR
 
-        FOR                         ${strategy_actions}         IN                          @{strategies}
+        FOR                     ${strategy_actions}         IN                          @{strategies}
             ${strategy_passed}=                             Set Variable                ${True}
             ${temp_passed_actions}=                         Create List
 
             FOR                 ${action}                   IN                          @{strategy_actions}
                 ${keyword}=     Get From Dictionary         ${action}                   keyword                     default=UNKNOWN_KEYWORD
-         
+
                 IF              '${keyword}' == 'UI Login Via JWT' or '${keyword}' == 'Login'
-                    Log To Console      ⏩ Skipping '${keyword}' during agentic execution (already logged in).
+                    Log To Console                          ⏩ Skipping '${keyword}' during agentic execution (already logged in).
                     CONTINUE
                 END
 
@@ -433,7 +433,7 @@ Execute Agentic JSON Steps
                 Set To Dictionary                           ${action}                   url_before                  ${url_before}
 
                 Log To Console                              ↳ Executing: ${keyword}
-                ${status}       ${message}=                 Run Keyword And Ignore Error                            ${keyword}                  @{escaped_args}    &{clean_kwargs}
+                ${status}       ${message}=                 Run Keyword And Ignore Error                            ${keyword}                  @{escaped_args}        &{clean_kwargs}
                 ${url_after}=                               GetUrl
                 Set To Dictionary                           ${action}                   url_after                   ${url_after}
 
@@ -441,7 +441,7 @@ Execute Agentic JSON Steps
                     ${is_destructive}=                      Set Variable                ${False}
                     FOR         ${arg}                      IN                          @{escaped_args}
                         ${arg_lower}=                       Evaluate                    str($arg).lower().strip()
-                        ${trigger_hit}=                     Run Keyword And Return Status                           Should Contain              ${DESTRUCTIVE_TRIGGERS}    ${arg_lower}
+                        ${trigger_hit}=                     Run Keyword And Return Status                           Should Contain              ${DESTRUCTIVE_TRIGGERS}                       ${arg_lower}
                         IF      ${trigger_hit}
                             ${is_destructive}=              Set Variable                ${True}
                             BREAK
@@ -454,13 +454,13 @@ Execute Agentic JSON Steps
                         ${snag_found}=                      IsText                      We hit a snag               timeout=3s
                         ${review_found}=                    IsText                      Review the following fields                             timeout=2s
                         ${field_error}=                     IsElement                   xpath=//div[contains(@class,'slds-has-error')]          timeout=2s
-                        ${toast_error}=                     IsElement                   xpath=//*[contains(@class,'slds-theme_error')]         timeout=2s
+                        ${toast_error}=                     IsElement                   xpath=//*[contains(@class,'slds-theme_error')]          timeout=2s
                         ${snag_detected}=                   Evaluate                    $snag_found or $review_found or $field_error or $toast_error
 
                         IF      ${snag_detected}
                             UseModal                        On
                             ${snag_detail}=                 Set Variable                ${EMPTY}
-                            IF      ${snag_found}
+                            IF                              ${snag_found}
                                 ${snag_detail}=             Set Variable                'We hit a snag' banner visible
                             ELSE IF                         ${review_found}
                                 ${snag_detail}=             Set Variable                'Review the following fields' banner visible
@@ -506,11 +506,11 @@ Execute Agentic JSON Steps
 
         IF                      not ${step_passed}
             Append To Failed History                        ${step}
-            Log To Console                                  ❌ All strategies failed for: ${step_intent}.
-            RETURN              FAIL                        ${step}                     ${last_error}               ${index}                   ${failure_mode}
+            Log To Console      ❌ All strategies failed for: ${step_intent}.
+            RETURN              FAIL                        ${step}                     ${last_error}               ${index}                    ${failure_mode}
         END
     END
-    RETURN                      PASS                        ${NONE}                     ${EMPTY}                    -1                         NONE
+    RETURN                      PASS                        ${NONE}                     ${EMPTY}                    -1                          NONE
 
 Generate Agentic System Prompt
     [Documentation]             Defines clean, low-bloat rules for the blind initial generation phase.
@@ -544,19 +544,19 @@ Generate Agentic System Prompt
 
 Resolve Step Failure
     [Documentation]             Recovers from a failed agentic step by opening a FRESH dialogue thread for the AI Surgeon.
-    [Arguments]                 ${assistant_id}             ${failed_step}              ${error_message}            ${remaining_steps}    ${dom_json_path}    ${screenshot_path}    ${executed_history_json}    ${user_intent}    ${failure_mode}=HARD_KEYWORD_ERROR
+    [Arguments]                 ${assistant_id}             ${failed_step}              ${error_message}            ${remaining_steps}          ${dom_json_path}       ${screenshot_path}     ${executed_history_json}    ${user_intent}    ${failure_mode}=HARD_KEYWORD_ERROR
     ${ORIGINAL_DIALOGUE_ID}=    Set Variable                ${DIALOGUE_ID}
     Log To Console              🔒 Original dialogue preserved: ${ORIGINAL_DIALOGUE_ID}
     Log To Console              🆕 Opening fresh surgeon dialogue...
     ${DIALOGUE_ID}              Create Dialogue Thread      ${assistant_id}
     Log To Console              ✅ Surgeon dialogue created: ${DIALOGUE_ID}
 
-    IF  '${dom_json_path}' != '${NONE}'
+    IF                          '${dom_json_path}' != '${NONE}'
         Attach Document To Dialogue                         ${dom_json_path}            ${DIALOGUE_ID}
     END
 
     ${markdown_image}=          Set Variable                ${EMPTY}
-    IF  '${screenshot_path}' != '${NONE}'
+    IF                          '${screenshot_path}' != '${NONE}'
         Log To Console          📸 Encoding failure screenshot for AI Vision...
         ${base64_image}=        Evaluate                    __import__('base64').b64encode(open(r'${screenshot_path}', 'rb').read()).decode('utf-8')
         ${markdown_image}=      Set Variable                \n\n![Screenshot](data:image/png;base64,${base64_image})
@@ -565,48 +565,48 @@ Resolve Step Failure
     ${surgeon_prompt}=          Catenate
     ...                         You are an expert QA Automation AI Surgeon specializing in Salesforce testing using Robot Framework and QWeb.
     ...                         Your objective is to analyze a single failed test step, evaluate the error, and provide a corrected version of THAT SPECIFIC STEP so the test execution can successfully heal and continue.
-    ...                         
+    ...
     ...                         --- FAILURE CONTEXT ---
     ...                         • Failed Step: ${failed_step}
     ...                         • Error Encountered: ${error_message}
     ...                         • Prior Execution History: ${executed_history_json}
-    ...                         
+    ...
     ...                         --- CRITICAL HEALING RULES FOR PICKLISTS ---
     ...                         1. If the failure involves selecting a picklist value (e.g., 'Open - Not Contacted' is not found), you MUST consult the attached 'org_context_*.json' metadata file.
     ...                         2. Treat this JSON file as your absolute source of truth. Locate the specific object (e.g., Lead) and field (e.g., Status) to view the actual allowed 'picklistValues' array.
     ...                         3. Identify a valid option string directly from the metadata list. Update the failed step arguments to use this valid option instead. Do NOT guess or invent values.
-    ...                         
+    ...
     ...                         --- SYSTEM CONSTRAINTS & OUTPUT FORMAT ---
     ...                         • You must respond ONLY with a single, valid JSON object representing the single corrected step.
     ...                         • Do NOT wrap your response in markdown code blocks like \`\`\`json ... \`\`\`.
     ...                         • The JSON must strictly follow this dictionary structure:
     ...                         {
-    ...                             "intent": "Select a valid alternative Status value derived from metadata context",
-    ...                             "keyword": "PickList",
-    ...                             "arguments": ["Status", "Working - Contacted"]
+    ...                         "intent": "Select a valid alternative Status value derived from metadata context",
+    ...                         "keyword": "PickList",
+    ...                         "arguments": ["Status", "Working - Contacted"]
     ...                         }
-    
+
     Send Message To Agent       ${assistant_id}             ${DIALOGUE_ID}              ${surgeon_prompt}
     ${ai_reply}=                Retrieve Agent Reply
-    
+
     # ── SELF-CORRECTION RETRY LOOP ──────────────────────────────────────────
-    FOR    ${attempt}    IN RANGE    1    4
-        ${status}    ${parsed}=  Run Keyword And Ignore Error                            Extract Agent JSON Reply    ${ai_reply}
-        ${is_dict}=              Evaluate                    isinstance($parsed, dict) if '${status}' == 'PASS' else False
-        
-        IF    ${is_dict}
+    FOR                         ${attempt}                  IN RANGE                    1                           4
+        ${status}               ${parsed}=                  Run Keyword And Ignore Error                            Extract Agent JSON Reply    ${ai_reply}
+        ${is_dict}=             Evaluate                    isinstance($parsed, dict) if '${status}' == 'PASS' else False
+
+        IF                      ${is_dict}
             Log To Console      ✅ AI Surgeon payload validated successfully as Dictionary structure on attempt ${attempt}.
             BREAK
         END
-        
+
         Log To Console          ⚠️ AI Surgeon returned invalid schema structure (Attempt ${attempt}/3). Issuing error correction...
-        ${correction_prompt}=    Catenate
+        ${correction_prompt}=                               Catenate
         ...                     CRITICAL ERROR: Your previous response violated the structural constraints.\n
         ...                     The response must be a single root JSON object/dictionary enclosed in curly braces {}.\n
         ...                     You returned a raw list/array or text format which caused a system type parsing failure.\n
         ...                     Please re-read the required keys ("escalate", "escalation_reason", "recovery_steps", "corrected_steps") and resubmit your response wrapped strictly inside a single JSON dictionary object.
-        
-        Send Message To Agent   ${assistant_id}             ${DIALOGUE_ID}              ${correction_prompt}
+
+        Send Message To Agent                               ${assistant_id}             ${DIALOGUE_ID}              ${correction_prompt}
         ${ai_reply}=            Retrieve Agent Reply
     END
     # ─────────────────────────────────────────────────────────────────────────
@@ -652,7 +652,7 @@ Extract Agent JSON Reply
         FOR                     ${msg}                      IN                          @{messages}
             ${role}=            Get From Dictionary         ${msg}                      role                        default=${EMPTY}
             IF                  '${role}' == 'ai'
-                ${ai_content}=                              Get From Dictionary         ${msg}                      content                    default=${NONE}
+                ${ai_content}=                              Get From Dictionary         ${msg}                      content                     default=${NONE}
             END
         END
         IF                      $ai_content == $NONE
@@ -671,8 +671,8 @@ Extract Agent JSON Reply
             END
             ${text_val}=        Get From Dictionary         ${item}                     text                        default=${EMPTY}
             ${stripped}=        Evaluate                    str($text_val).strip()
-            ${starts_with_bracket}=                         Run Keyword And Return Status                           Should Contain              ${stripped}        [
-            ${starts_with_brace}=                           Run Keyword And Return Status                           Should Contain              ${stripped}        {
+            ${starts_with_bracket}=                         Run Keyword And Return Status                           Should Contain              ${stripped}            [
+            ${starts_with_brace}=                           Run Keyword And Return Status                           Should Contain              ${stripped}            {
             IF                  ${starts_with_bracket} or ${starts_with_brace}
                 ${raw_text}=    Set Variable                ${text_val}
                 BREAK
