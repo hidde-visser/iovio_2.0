@@ -9,6 +9,7 @@ Library                         ../resources/ObjectSanitizer.py
 Resource                        ../resources/MetadataRetrieval.robot
 Library                         ../resources/DomParserLibrary.py
 Library                         ../resources/ExplorationSessionLibrary.py
+Library                         ../resources/png_to_pdf_library.py
 Resource                        ../resources/CopadoAI.robot
 
 
