@@ -544,28 +544,29 @@ Generate Agentic System Prompt
 
 Resolve Step Failure
     [Documentation]             Recovers from a failed agentic step by opening a FRESH dialogue thread for the AI Surgeon.
-    [Arguments]                 ${assistant_id}             ${failed_step}              ${error_message}            ${remaining_steps}          ${dom_json_path}       ${screenshot_path}     ${executed_history_json}    ${user_intent}    ${failure_mode}=HARD_KEYWORD_ERROR
+    [Arguments]                 ${assistant_id}             ${failed_step}              ${error_message}            ${remaining_steps}    ${dom_json_path}    ${pdf_path}    ${executed_history_json}    ${user_intent}    ${failure_mode}=HARD_KEYWORD_ERROR
+    
     ${ORIGINAL_DIALOGUE_ID}=    Set Variable                ${DIALOGUE_ID}
     Log To Console              🔒 Original dialogue preserved: ${ORIGINAL_DIALOGUE_ID}
     Log To Console              🆕 Opening fresh surgeon dialogue...
     ${DIALOGUE_ID}              Create Dialogue Thread      ${assistant_id}
     Log To Console              ✅ Surgeon dialogue created: ${DIALOGUE_ID}
 
-    IF                          '${dom_json_path}' != '${NONE}'
+    IF  '${dom_json_path}' != '${NONE}'
         Attach Document To Dialogue                         ${dom_json_path}            ${DIALOGUE_ID}
     END
 
-    ${markdown_image}=          Set Variable                ${EMPTY}
-    IF                          '${screenshot_path}' != '${NONE}'
-        Log To Console          📸 Encoding failure screenshot for AI Vision...
-        ${base64_image}=        Evaluate                    __import__('base64').b64encode(open(r'${screenshot_path}', 'rb').read()).decode('utf-8')
-        ${markdown_image}=      Set Variable                \n\n![Screenshot](data:image/png;base64,${base64_image})
+    # Attach the newly generated PDF failure screenshot to the Surgeon Dialogue
+    IF  '${pdf_path}' != '${NONE}'
+        Log To Console          📸 Attaching failure screenshot PDF for AI Vision...
+        Attach Document To Dialogue                         ${pdf_path}                 ${DIALOGUE_ID}
     END
 
     ${surgeon_prompt}=          Catenate
     ...                         You are an expert QA Automation AI Surgeon specializing in Salesforce testing using Robot Framework and QWeb.
     ...                         Your objective is to analyze a single failed test step, evaluate the error, and provide a corrected version of THAT SPECIFIC STEP so the test execution can successfully heal and continue.
-    ...
+    ...                         A screenshot of the exact failure moment has been attached to this thread as a PDF for your visual reference.
+    ...                         
     ...                         --- FAILURE CONTEXT ---
     ...                         • Failed Step: ${failed_step}
     ...                         • Error Encountered: ${error_message}
