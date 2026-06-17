@@ -255,18 +255,20 @@ Run Agentic Test Scenario
             ${ts}=              Get Current Date            result_format=%Y%m%d_%H%M%S
             ${screenshot_name}=                             Set Variable                ${test_name}_failure_${ts}.png
             ${screenshot_path}=                             Set Variable                ${OUTPUT_DIR}/${screenshot_name}
+            ${pdf_path}=                                    Set Variable                ${OUTPUT_DIR}/${test_name}_failure_${ts}.pdf
 
-            # QWeb's LogScreenshot forces its own naming convention (screenshot-<test>-<uuid>.png).
+            # QWeb's LogScreenshot forces its own naming convention.
             # We capture its returned path and copy it to our custom test-named path.
             ${qweb_screenshot}=                             LogScreenshot
             Copy File           ${qweb_screenshot}          ${screenshot_path}
             Sleep               1s
+            
+            # Convert the captured PNG to PDF immediately
+            Convert Png To Pdf  ${screenshot_path}          ${pdf_path}
             # -------------------------------
 
             ${remaining_steps}=                             Get Slice From List         ${active_steps}             ${failed_index + 1}
             ${remaining_json}=                              Evaluate                    json.dumps($remaining_steps)                           json
-
-            # Serialize the successful step history to pass to the surgeon.
             ${executed_history_json}=                       Evaluate                    json.dumps($EXECUTION_HISTORY_PASSED)                  json
 
             Log To Console      🏥 Calling AI Surgeon for recovery. Failure mode: ${failure_mode}
@@ -276,7 +278,7 @@ Run Agentic Test Scenario
             ...                 ${error_msg}
             ...                 ${remaining_steps}
             ...                 ${dom_json_path}
-            ...                 ${screenshot_path}
+            ...                 ${pdf_path}    # Pass the PDF path instead of the PNG
             ...                 ${executed_history_json}
             ...                 ${user_intent}
             ...                 ${failure_mode}
