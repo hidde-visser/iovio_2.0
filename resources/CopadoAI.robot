@@ -342,6 +342,28 @@ Compile Golden Path Script
 
     RETURN                      ${script_content}
 
+Generate Agentic Test Name
+    [Documentation]             Asks the AI to generate a concise, snake_case test case name based on the user intent.
+    [Arguments]                 ${assistant_id}             ${DIALOGUE_ID}              ${user_intent}
+    
+    ${prompt}=                  Catenate
+    ...                         Please generate a concise, descriptive Robot Framework test case name for the following test intent.\n
+    ...                         Format the name without spaces (use underscores, e.g., Create_New_Lead_Record).\n
+    ...                         USER INTENT: ${user_intent}\n\n
+    ...                         Return ONLY a valid JSON object matching this schema:\n
+    ...                         {\n
+    ...                             "test_name": "Generated_Test_Name"\n
+    ...                         }
+    
+    Log To Console              🧠 Generating descriptive test name for intent...
+    Send Message To Agent       ${assistant_id}             ${DIALOGUE_ID}              ${prompt}
+    ${ai_reply}=                Retrieve Agent Reply
+    ${parsed_json}=             Extract Agent JSON Reply    ${ai_reply}
+    
+    ${test_name}=               Get From Dictionary         ${parsed_json}              test_name                   default=Agentic_Generated_Test
+    ${test_name}=               Evaluate                    str('${test_name}').replace(' ', '_')
+    RETURN                      ${test_name}
+
 Execute Agentic JSON Steps
     [Documentation]             Iterates over AI-proposed JSON steps, executes them, and routes failures.
     [Arguments]                 ${json_steps}               ${user_intent}
