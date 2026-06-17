@@ -175,7 +175,7 @@ Run Agentic Test Scenario
     IF                          $metadata_json_path != $NONE and $metadata_json_path != '${EMPTY}'
         Log To Console          📦 Attaching Salesforce Org Metadata Contract...
         Wait Until Keyword Succeeds                         10x
-        ...                     2s                          Attach Document To Dialogue                             ${DIALOGUE_ID}              ${metadata_json_path}
+        ...                     2s                          Attach Document To Dialogue                             ${DIALOGUE_ID}             ${metadata_json_path}
     END
 
     ${ai_reply}=                Generate Initial Test Steps
@@ -183,7 +183,7 @@ Run Agentic Test Scenario
     ${active_steps}=            Extract Agent JSON Reply    ${ai_reply}
 
     # ── V0.12: DYNAMIC TEST NAMING ───────────────────────────────────────────
-    ${test_name}=               Generate Agentic Test Name  ${assistant_id}             ${DIALOGUE_ID}              ${user_intent}
+    ${test_name}=               Generate Agentic Test Name                              ${assistant_id}             ${DIALOGUE_ID}             ${user_intent}
     Log To Console              🏷️ Test named as: ${test_name}
     # ─────────────────────────────────────────────────────────────────────────
 
@@ -229,7 +229,7 @@ Run Agentic Test Scenario
                 # Pure Robot Framework replacement to verify negative testing intent
                 ${user_intent_lower}=                       Convert To Lower Case       ${user_intent}
                 ${is_negative_test}=                        Set Variable                ${False}
-                @{boundary_words}=                          Create List                 exceed                      limit                      error                 validation             invalid             boundary
+                @{boundary_words}=                          Create List                 exceed                      limit                      error                 validation             invalid    boundary
 
                 FOR             ${word}                     IN                          @{boundary_words}
                     ${contains}=                            Run Keyword And Return Status                           Should Contain             ${user_intent_lower}             ${word}
@@ -252,11 +252,13 @@ Run Agentic Test Scenario
 
             # --- Capture Screenshot ---
             ${ts}=              Get Current Date            result_format=%Y%m%d_%H%M%S
-            # ── V0.12: INJECT TEST NAME INTO SCREENSHOT ────────────────────────
             ${screenshot_name}=                             Set Variable                ${test_name}_failure_${ts}.png
             ${screenshot_path}=                             Set Variable                ${OUTPUT_DIR}/${screenshot_name}
 
-            LogScreenshot       ${screenshot_path}
+            # QWeb's LogScreenshot forces its own naming convention (screenshot-<test>-<uuid>.png).
+            # We capture its returned path and copy it to our custom test-named path.
+            ${qweb_screenshot}=                             LogScreenshot
+            Copy File           ${qweb_screenshot}          ${screenshot_path}
             Sleep               1s
             # -------------------------------
 
