@@ -18,29 +18,30 @@ ${target_assistant_name}        Orchestrate Agent
 ${number_of_scenarios}          3
 
 *** Test Cases ***
-Test
-    ${ts}=                      Get Current Date            result_format=%Y%m%d_%H%M%S
-    ${screenshot_name}=         Set Variable                ${test_name}_failure_${ts}.png
-    ${screenshot_path}=         Set Variable                ${OUTPUT_DIR}/${screenshot_name}
+# Test
+#     ${ts}=                      Get Current Date            result_format=%Y%m%d_%H%M%S
+#     ${screenshot_name}=         Set Variable                ${test_name}_failure_${ts}.png
+#     ${screenshot_path}=         Set Variable                ${OUTPUT_DIR}/${screenshot_name}
 
-    # QWeb's LogScreenshot forces its own naming convention (screenshot-<test>-<uuid>.png).
-    # We capture its returned path and copy it to our custom test-named path.
-    ${qweb_screenshot}=         LogScreenshot
-    Copy File                   ${qweb_screenshot}          ${screenshot_path}
+#     # QWeb's LogScreenshot forces its own naming convention (screenshot-<test>-<uuid>.png).
+#     # We capture its returned path and copy it to our custom test-named path.
+#     ${qweb_screenshot}=         LogScreenshot
+#     Copy File                   ${qweb_screenshot}          ${screenshot_path}
 
-    ${response}                 Prompt                      Can you read this screenshot ${screenshot_path}
-    Log To Console              ${response}
+#     ${response}                 Prompt                      Can you read this screenshot ${screenshot_path}
+#     Log To Console              ${response}
 
-    ${pdf_file}                 Set Variable                ${OUTPUT_DIR}/${test_name}_failure_${ts}.pdf
+#     ${pdf_file}                 Set Variable                ${OUTPUT_DIR}/${test_name}_failure_${ts}.pdf
 
-    Convert Png To Pdf          ${screenshot_path}          ${pdf_file}  
+#     Convert Png To Pdf          ${screenshot_path}          ${pdf_file}  
 
+*** Test Cases ***
 Conversational AI Health Check
-    [Documentation]             Feeds org data to the AI, asks for advice, and executes the results.
-
-    # # 1. Fetch the Org Data (The script does this, not the AI)
+    [Documentation]             Feeds org data and a UI screenshot to the AI, asks for advice, and executes the results.
+    
+    # 1. Fetch the Org Data (The script does this, not the AI)
     ${timestamp}=               Get Time                    format=%Y-%m-%dT%H%M%S
-    ${config}=                  Build Org Contract Config                               ${objects}[0]
+    ${config}=                  Build Org Contract Config                              ${objects}[0]
     ${raw_result}=              Execute Dynamic Operations                              ${config}
     ${obj_dict}=                Create Dictionary           Lead=${raw_result}
     ${clean_result}=            Sanitize Org Contract       ${obj_dict}
@@ -48,21 +49,33 @@ Conversational AI Health Check
     ${meta_file}=               Set Variable                ${OUTPUT_DIR}/org_context_${timestamp}.json
     Create File                 ${meta_file}                ${clean_result}
 
+    # 2. Capture the UI Screenshot and Convert to PDF
+    Log To Console              📸 Capturing current UI state...
+    ${qweb_screenshot}=         LogScreenshot
+    ${pdf_file}=                Set Variable                ${OUTPUT_DIR}/health_check_ui_${timestamp}.pdf
+    Convert Png To Pdf          ${qweb_screenshot}          ${pdf_file}
+
+    # 3. Initialize Copado AI Session & Thread
     Initialize Copado AI Session
     ${TARGET_ASSISTANT_ID}=     Get Agent ID By Name        ${target_assistant_name}    ${CLEAN_WSPACE}
-
     ${DIALOGUE_ID}              Create Dialogue Thread      ${TARGET_ASSISTANT_ID}
 
-    Log To Console              🧠 Giving the ${target_assistant_name} access to the org data...
+    Log To Console              🧠 Giving the ${target_assistant_name} access to the org data and screenshot...
+    
+    # Attach Metadata Document
     Attach Document To Dialogue                             ${meta_file}                ${DIALOGUE_ID}
     Verify Document Is Ready    org_context_${timestamp}.json                           ${DIALOGUE_ID}
+
+    # Attach Screenshot PDF Document
+    Attach Document To Dialogue                             ${pdf_file}                 ${DIALOGUE_ID}
+    Verify Document Is Ready    health_check_ui_${timestamp}.pdf                        ${DIALOGUE_ID}
 
     # 4. Formulate the Guardrail-Bypass Prompt
     Log To Console              💬 Asking the AI what we should test...
     ${prompt}=                  Catenate
-    ...                         You are a Salesforce QA Architect. I have attached the metadata for my Salesforce org.\n
-    ...                         Please perform a Health Check analysis on this metadata.\n
-    ...                         Identify the ${number_of_scenarios} most critical test scenarios we should execute based on validation rules, required fields, and layouts.\n
+    ...                         You are a Salesforce QA Architect. I have attached the metadata for my Salesforce org AND a PDF screenshot of the current UI.\n
+    ...                         Please perform a Health Check analysis on this metadata and visual context.\n
+    ...                         Identify the ${number_of_scenarios} most critical test scenarios we should execute based on validation rules, required fields, layouts, and the visual state.\n
     ...                         I understand that you must provide context and act as a knowledgeable mentor. Therefore, please explain your reasoning fully, but format your ENTIRE response as a structured JSON array.\n
     ...                         Place your detailed mentor explanation inside the "explanation" key for each scenario.\n
     ...                         You must use this exact JSON schema:\n
@@ -76,10 +89,9 @@ Conversational AI Health Check
 
     # 5. Send the Message (With explicit Document Processing Wait and Circuit Breaker)
     TRY
-        Log To Console          ⏳ Giving the AI 60 seconds to index the metadata document...
+        Log To Console          ⏳ Giving the AI 60 seconds to index the documents...
         Sleep                   60s
 
-        # FIX: Pass Dialogue ID as the first positional argument
         Wait Until Dialogue Is Idle                         ${DIALOGUE_ID}              max_attempts=12        poll_interval=5s
 
         Log To Console          💬 Sending prompt to agent...
@@ -90,13 +102,16 @@ Conversational AI Health Check
         Log To Console          ⚠️ Agent thread seems locked/bricked. Initiating a new chat...
 
         ${DIALOGUE_ID}          Create Dialogue Thread      ${TARGET_ASSISTANT_ID}
+        
         Attach Document To Dialogue                         ${meta_file}                ${DIALOGUE_ID}
         Verify Document Is Ready                            org_context_${timestamp}.json                      ${DIALOGUE_ID}
+        
+        Attach Document To Dialogue                         ${pdf_file}                 ${DIALOGUE_ID}
+        Verify Document Is Ready                            health_check_ui_${timestamp}.pdf                   ${DIALOGUE_ID}
 
-        Log To Console          ⏳ Giving the new thread 60 seconds to index the metadata document...
+        Log To Console          ⏳ Giving the new thread 60 seconds to index the documents...
         Sleep                   60s
 
-        # FIX: Pass Dialogue ID as the first positional argument here too
         Wait Until Dialogue Is Idle                         ${DIALOGUE_ID}              max_attempts=12        poll_interval=5s
 
         Send Message To Agent                               ${TARGET_ASSISTANT_ID}      ${DIALOGUE_ID}         ${prompt}                 max_retries=50
