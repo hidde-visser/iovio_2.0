@@ -2,7 +2,7 @@
 Library                         RequestsLibrary
 Library                         QForce
 Library                         CopadoAI
-Library                         img2pdf
+Library                         ../resources/png_to_pdf_library.py
 Library                         XML
 Resource                        ../resources/CopadoAI.robot
 Library                         ../resources/ObjectSanitizer.py
